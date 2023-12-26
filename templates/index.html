@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tap BPM Calculator and Chordify</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #eaeaea;
+            color: #ofb65;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .title {
+            font-size: 57px;
+            margin-bottom: 30px;
+            color: #3e606f;
+        }
+
+        form, div, label {
+            margin: 10px 0;
+        }
+
+        input[type="file"], input[type="submit"], input[type="number"], button {
+            background-color: #82b8ad;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 5px;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        #chordifyResults {
+            margin-top: 20px;
+            background-color: #fcfff5;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        input[type="file"], input[type="submit"], input[type="number"], button:hover {
+            background-color: #fpe0de;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">Chordify</div>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".wav">
+        <input type="submit" value="Upload">
+    </form>
+    <audio controls id="audioPlayer">
+        <source src="/audio" type="audio/wav">
+        Your browser does not support the audio element.
+    </audio>
+    <div>
+        <button id="startButton">Start</button>
+        <span id="countdownDisplay">10</span>
+    </div>
+    <button id="tapButton" disabled>Tap</button>
+    <div>
+        Calculated BPM: <span id="bpmDisplay">0</span>
+    </div>
+    <button id="autoTempoButton">Auto Tempo Detection</button>
+    <div>
+        Detected BPM: <span id="detectedBpmDisplay">0</span>
+    </div>
+    <label>
+        <input type="checkbox" id="useTapTempo" name="tempoSource" value="tap" checked> Use Tap Tempo
+    </label>
+    <label>
+        <input type="checkbox" id="useCalculatedTempo" name="tempoSource" value="calculated"> Use Calculated Tempo
+    </label>
+    <div>
+        <label for="beatsPerBar">Beats per Bar:</label>
+
+        <input type="number" id="beatsPerBar" value="4">
+    <div>
+    <div>
+        Time per Bar: <span id="timePerBarDisplay">0</span> seconds
+    </div>
+
+    <!-- Chordify Button -->
+    <button id="chordifyButton">Chordify</button>
+
+    <!-- Display for Chordify Predictions -->
+    <div id="chordifyResults"></div>
+
+
+    <script>
+        var countdownDisplay = document.getElementById('countdownDisplay');
+        var bpmDisplay = document.getElementById('bpmDisplay');
+        var tapTimes = [];
+
+        document.getElementById('startButton').onclick = function() {
+            var countdown = 10;
+            countdownDisplay.innerText = countdown;
+            tapTimes = [];
+            document.getElementById('tapButton').disabled = false;
+            var interval = setInterval(function() {
+                countdown--;
+                countdownDisplay.innerText = countdown;
+                if (countdown <= 0) {
+                    clearInterval(interval);
+                    calculateBPM();
+                    document.getElementById('tapButton').disabled = true;
+                }
+            }, 1000);
+            document.getElementById('audioPlayer').play();
+        };
+
+        document.getElementById('tapButton').onclick = function() {
+            tapTimes.push(new Date().getTime());
+        };
+
+        function calculateBPM() {
+            var intervals = [];
+            for (var i = 1; i < tapTimes.length; i++) {
+                intervals.push(tapTimes[i] - tapTimes[i - 1]);
+            }
+            var averageInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+            var bpm = 60000 / averageInterval;
+            bpmDisplay.innerText = bpm.toFixed(2);
+        }
+
+        document.getElementById('autoTempoButton').onclick = function() {
+            fetch('/detect_tempo')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('detectedBpmDisplay').innerText = data.tempo.toFixed(2);
+                })
+                .catch(error => console.error('Error:', error));
+        };
+        document.getElementById('autoTempoButton').onclick = function() {
+            fetch('/detect_tempo')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('detectedBpmDisplay').innerText = data.tempo.toFixed(2);
+                    calculateTimePerBar(data.tempo);
+                })
+                .catch(error => console.error('Error:', error));
+        };
+    
+        function calculateTimePerBar(tempo) {
+            var beatsPerBar = parseInt(document.getElementById('beatsPerBar').value);
+            var timePerBar = (60 / tempo) * beatsPerBar;
+            document.getElementById('timePerBarDisplay').innerText = timePerBar.toFixed(2);
+        }
+
+        document.getElementById('chordifyButton').onclick = function() {
+            var beatsPerBar = parseInt(document.getElementById('beatsPerBar').value);
+            fetch('/process_audio?beats_per_bar=' + beatsPerBar)
+                .then(response => response.json())
+                .then(data => {
+                    var resultsDiv = document.getElementById('chordifyResults');
+                    resultsDiv.innerHTML = 'Chordify Predictions:<br>' + data.join('<br>');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('chordifyResults').innerHTML = 'Error processing audio.';
+                });
+        };
+        function calculateTimePerBar() {
+            var beatsPerBar = parseInt(document.getElementById('beatsPerBar').value);
+            var tempo;
+            if (document.getElementById('useTapTempo').checked) {
+                tempo = parseFloat(document.getElementById('bpmDisplay').innerText);
+            } else if (document.getElementById('useCalculatedTempo').checked) {
+                tempo = parseFloat(document.getElementById('detectedBpmDisplay').innerText);
+            }
+            var timePerBar = (60 / tempo) * beatsPerBar;
+            document.getElementById('timePerBarDisplay').innerText = timePerBar.toFixed(2);
+        }
+
+        // Event listeners for checkboxes to recalculate time per bar when changed
+        document.getElementById('useTapTempo').addEventListener('change', function() {
+            if (this.checked) {
+                document.getElementById('useCalculatedTempo').checked = false;
+                calculateTimePerBar();
+            }
+        });
+
+        document.getElementById('useCalculatedTempo').addEventListener('change', function() {
+            if (this.checked) {
+                document.getElementById('useTapTempo').checked = false;
+                calculateTimePerBar();
+            }
+        });
+    </script>
+</body>
+</html>
