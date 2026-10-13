@@ -75,7 +75,7 @@ struct EmptyStateView: View {
 struct AnalyzingView: View {
     var title: String
     var stage: Analyzer.Stage
-    private let stages: [Analyzer.Stage] = [.decoding, .tuning, .chords, .beats, .finishing]
+    private let stages: [Analyzer.Stage] = [.decoding, .tuning, .listening, .finishing]
 
     var body: some View {
         VStack(spacing: 26) {

@@ -33,7 +33,6 @@ jobs:
       - name: Command-line analysis (release build)
         run: |
           build/Chordify.app/Contents/MacOS/Chordify --analyze legacy/2023-cs545-svm/sample_audio.wav --midi build/sample.mid
-          CHORDIFY_COREML=ALL build/Chordify.app/Contents/MacOS/Chordify --analyze legacy/2023-cs545-svm/sample_audio.wav | head -12 || true
       - name: Launch smoke test
         run: |
           build/Chordify.app/Contents/MacOS/Chordify &

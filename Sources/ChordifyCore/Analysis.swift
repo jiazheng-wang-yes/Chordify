@@ -122,8 +122,7 @@ public final class Analyzer: @unchecked Sendable {
     public enum Stage: String, Sendable {
         case decoding = "Reading audio"
         case tuning = "Measuring tuning"
-        case chords = "Listening for chords"
-        case beats = "Finding the beat"
+        case listening = "Listening for chords and beats"
         case finishing = "Writing the chart"
     }
 
@@ -132,10 +131,7 @@ public final class Analyzer: @unchecked Sendable {
     private let modelsDir: URL
     private lazy var chordModel = Result { try OnnxModel(url: modelsDir.appendingPathComponent("chordnet.onnx")) }
     private lazy var melModel = Result { try OnnxModel(url: modelsDir.appendingPathComponent("beat_mel.onnx")) }
-    private lazy var beatModel = Result {
-        try OnnxModel(url: modelsDir.appendingPathComponent("beat_this.onnx"),
-                      coreMLUnits: ProcessInfo.processInfo.environment["CHORDIFY_COREML"])
-    }
+    private lazy var beatModel = Result { try OnnxModel(url: modelsDir.appendingPathComponent("beat_this.onnx")) }
     private let lock = NSLock()
 
     public init(modelsDirectory: URL? = nil) throws {
@@ -167,11 +163,19 @@ public final class Analyzer: @unchecked Sendable {
             chordFPS = Self.sampleRate * ratio / Self.chordHop
         }
 
-        progress(.chords)
-        let probs = try chordProbabilities(chordAudio, fps: chordFPS)
-
-        progress(.beats)
-        let (beats, downbeats) = try beatTimes(audio)
+        // The chord and beat networks run at the same time.
+        progress(.listening)
+        _ = (try chordModel.get(), try melModel.get(), try beatModel.get())  // load before going parallel
+        let box = ParallelResults()
+        DispatchQueue.concurrentPerform(iterations: 2) { i in
+            if i == 0 {
+                box.chords = Result { try self.chordProbabilities(chordAudio, fps: chordFPS) }
+            } else {
+                box.beats = Result { try self.beatTimes(audio) }
+            }
+        }
+        let probs = try box.chords!.get()
+        let (beats, downbeats) = try box.beats!.get()
 
         progress(.finishing)
         let segments = decode(probs, beats: beats, extensionBoost: extensionBoost)
@@ -236,6 +240,11 @@ public final class Analyzer: @unchecked Sendable {
         let beats = BeatTracking.fillGaps(raw.beats)
         return (beats, BeatTracking.cleanDownbeats(beats: beats, downbeats: raw.downbeats))
     }
+}
+
+private final class ParallelResults: @unchecked Sendable {
+    var chords: Result<ChordProbabilities, Error>?
+    var beats: Result<(beats: [Double], downbeats: [Double]), Error>?
 }
 
 /// On-disk cache of analyses, keyed by file content.

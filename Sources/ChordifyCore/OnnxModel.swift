@@ -21,19 +21,11 @@ final class OnnxModel {
     private static let env: ORTEnv? = try? ORTEnv(loggingLevel: .warning)
     private let session: ORTSession
 
-    /// `coreMLUnits` ("ALL", "CPUAndGPU", "CPUAndNeuralEngine") adds the Core ML
-    /// execution provider in front of the CPU one.
-    init(url: URL, coreMLUnits: String? = nil) throws {
+    init(url: URL) throws {
         guard let env = Self.env else { throw ChordifyError.inference("could not start ONNX Runtime") }
         let options = try ORTSessionOptions()
         try options.setGraphOptimizationLevel(.all)
         try options.setIntraOpNumThreads(Int32(max(1, min(8, ProcessInfo.processInfo.activeProcessorCount))))
-        if let units = coreMLUnits, ORTIsCoreMLExecutionProviderAvailable() {
-            try options.appendCoreMLExecutionProvider(withOptionsV2: [
-                "MLComputeUnits": units,
-                "ModelFormat": "MLProgram",
-            ])
-        }
         session = try ORTSession(env: env, modelPath: url.path, sessionOptions: options)
     }
 

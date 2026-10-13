@@ -5,7 +5,7 @@ import Foundation
 /// (similar in spirit to librosa.estimate_tuning: spectral peaks, parabolic
 /// interpolation, histogram of deviations from the equal-tempered grid).
 public enum Tuning {
-    public static func estimateCents(_ x: [Float], sampleRate sr: Double, maxFrames: Int = 800) -> Double {
+    public static func estimateCents(_ x: [Float], sampleRate sr: Double, maxFrames: Int = 300) -> Double {
         let log2n = 12
         let n = 1 << log2n
         guard x.count > n * 4, let setup = vDSP_create_fftsetup(vDSP_Length(log2n), FFTRadix(kFFTRadix2)) else { return 0 }
