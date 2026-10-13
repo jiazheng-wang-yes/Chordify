@@ -1,0 +1,42 @@
+name: macOS app
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Package.swift"
+      - "Sources/**"
+      - "Tests/**"
+      - "Resources/**"
+      - "Models/**"
+      - "scripts/**"
+      - ".github/workflows/macos.yml"
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          sw_vers
+          swift --version
+          sysctl -n machdep.cpu.brand_string
+      - name: Unit and end-to-end tests
+        run: swift test
+      - name: Build Chordify.app
+        run: scripts/build_app.sh
+      - name: Launch smoke test
+        run: |
+          build/Chordify.app/Contents/MacOS/Chordify &
+          PID=$!
+          sleep 8
+          if kill -0 $PID 2>/dev/null; then echo "app is running"; kill $PID; else echo "app exited early"; exit 1; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Chordify-macOS-arm64
+          path: build/Chordify.zip

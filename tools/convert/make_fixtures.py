@@ -44,12 +44,14 @@ def main():
     bsess = ort.InferenceSession(f"{args.models}/beat_this.onnx")
     bl, dl = rp.beat_logits(mel, lambda x: bsess.run(None, {"spect": x}))
     np.stack([bl, dl]).astype(np.float32).tofile(os.path.join(args.out, "beat_logits.bin"))
-    beats, downbeats = rp.postprocess_beats(bl, dl)
+    raw_beats, raw_downbeats = rp.postprocess_beats(bl, dl)
+    beats = rp.fill_beat_gaps(raw_beats)
+    downbeats = rp.clean_downbeats(beats, raw_downbeats)
 
     viterbi_cases = []
     for name, pen in [
         ("constant30", np.full(n_frames, 30.0)),
-        ("beats", rp.beat_change_penalties(n_frames, beats, 60.0, 10.0)),
+        ("beats", rp.beat_change_penalties(n_frames, beats, rp.OFF_BEAT_PENALTY, rp.ON_BEAT_PENALTY)),
     ]:
         path = rp.viterbi(obs, pen)
         viterbi_cases.append({
@@ -70,8 +72,20 @@ def main():
         "viterbi": viterbi_cases,
         "beat_frames": int(len(bl)),
         "chunk_starts": {str(n): rp.split_chunks(n) for n in [100, 1488, 1489, 1501, 4000, 15000]},
+        "raw_beats": raw_beats.tolist(),
+        "raw_downbeats": raw_downbeats.tolist(),
         "beats": beats.tolist(),
         "downbeats": downbeats.tolist(),
+        "gap_cases": [
+            {"in": b, "out": rp.fill_beat_gaps(np.array(b)).tolist()}
+            for b in [[0.0, 0.5, 1.0, 1.5, 2.5, 3.0, 3.5, 5.0, 5.5, 6.0],
+                      [0.0, 0.5, 1.0, 1.7, 2.2, 2.7, 3.9, 4.4], [1.0, 2.0]]
+        ],
+        "downbeat_cases": [
+            {"beats": [i * 0.5 for i in range(20)], "in": d,
+             "out": rp.clean_downbeats(np.array([i * 0.5 for i in range(20)]), np.array(d)).tolist()}
+            for d in [[0.0, 0.5, 2.0, 4.0, 6.0, 8.0], [0.1, 2.1, 3.0, 4.05, 6.0, 8.0], [1.0]]
+        ],
         "mel_checks": [[int(t), int(f), float(mel[t, f])] for t, f in [(0, 0), (100, 64), (1000, 127)]],
     }
     with open(os.path.join(args.out, "fixtures.json"), "w") as f:

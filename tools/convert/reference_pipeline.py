@@ -117,17 +117,20 @@ def pick_peaks(logits):
     padded = np.pad(logits, 3, constant_values=-np.inf)
     win = np.lib.stride_tricks.sliding_window_view(padded, 7).max(axis=1)
     frames = np.nonzero((logits == win) & (logits > 0))[0]
-    # deduplicate adjacent peaks (running mean of groups with gaps <= 1 frame)
+    # deduplicate adjacent peaks (beat_this.model.postprocessor.deduplicate_peaks)
     out = []
-    for f in frames:
-        if out and f - out[-1][1] <= 1:
-            grp = out[-1]
-            grp[2] += 1
-            grp[0] += (f - grp[0]) / grp[2]
-            grp[1] = f
+    if len(frames) == 0:
+        return np.array(out)
+    p, c = float(frames[0]), 1
+    for f in frames[1:]:
+        if f - p <= 1:
+            c += 1
+            p += (f - p) / c
         else:
-            out.append([float(f), f, 1])
-    return np.array([g[0] for g in out])
+            out.append(p)
+            p, c = float(f), 1
+    out.append(p)
+    return np.array(out)
 
 
 def postprocess_beats(beat, down):
@@ -138,8 +141,50 @@ def postprocess_beats(beat, down):
     return bt, dt
 
 
+def fill_beat_gaps(beats, tolerance=0.2):
+    """Insert beats that the peak picker dropped: a gap close to k local beat
+    periods (k >= 2) is split into k equal parts."""
+    beats = list(beats)
+    if len(beats) < 4:
+        return np.array(beats)
+    ibis = np.diff(beats)
+    out = [beats[0]]
+    for i, gap in enumerate(ibis):
+        lo, hi = max(0, i - 4), min(len(ibis), i + 5)
+        local = np.median(ibis[lo:hi])
+        k = int(round(gap / local))
+        if k >= 2 and abs(gap / k - local) < tolerance * local:
+            out.extend(beats[i] + gap * j / k for j in range(1, k))
+        out.append(beats[i + 1])
+    return np.array(out)
+
+
+def clean_downbeats(beats, downbeats):
+    """Snap downbeats to beats and drop the ones that would make a bar shorter
+    than half the typical bar (spurious downbeats, mostly in intros)."""
+    if len(beats) == 0 or len(downbeats) == 0:
+        return np.array(downbeats)
+    idx = sorted({int(np.argmin(np.abs(beats - d))) for d in downbeats})
+    if len(idx) < 3:
+        return beats[idx]
+    typical = np.median(np.diff(idx))
+    keep = [idx[0]]
+    for j in idx[1:]:
+        if j - keep[-1] < typical / 2:
+            # keep whichever of the two starts the more regular grid
+            if len(keep) == 1:
+                keep[-1] = j
+            continue
+        keep.append(j)
+    return beats[keep]
+
+
 # ---------------------------------------------------------------- pipeline
-def run(models_dir, audio_path, change_penalty=30.0, beat_penalty=None):
+OFF_BEAT_PENALTY = 50.0
+ON_BEAT_PENALTY = 25.0
+
+
+def run(models_dir, audio_path, change_penalty=OFF_BEAT_PENALTY, beat_penalty=ON_BEAT_PENALTY):
     import librosa
     import onnxruntime as ort
 
@@ -153,6 +198,8 @@ def run(models_dir, audio_path, change_penalty=30.0, beat_penalty=None):
     bsess = ort.InferenceSession(f"{models_dir}/beat_this.onnx")
     bl, dl = beat_logits(mel, lambda x: bsess.run(None, {"spect": x}))
     beats, downbeats = postprocess_beats(bl, dl)
+    beats = fill_beat_gaps(beats)
+    downbeats = clean_downbeats(beats, downbeats)
     t2 = time.time()
     vocab = json.load(open(f"{models_dir}/chord_vocab.json"))
     cands = expand_vocab(vocab)
