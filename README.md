@@ -10,8 +10,9 @@ Everything runs on your Mac (Apple silicon, macOS 14 or later). Nothing is uploa
 ## Features
 
 - **Drop a song, get the chart.** MP3, M4A/AAC, ALAC, WAV, AIFF, FLAC, CAF.
-  A 4-minute song takes a few seconds on an M1 Pro. Results are cached, so
-  re-opening a song is instant.
+  A 4:18 song takes 16.6 s on GitHub's 3-core virtual M1 (release build);
+  a 10-core M1 Pro should be faster. Results are cached, so re-opening a song
+  is instant.
 - **Audio and chords together.** The big chord display, the "next" chord, and a
   piano with the chord tones (bass marked) follow the playhead. The bar grid
   highlights the current beat and scrolls with the music. Click any beat or
