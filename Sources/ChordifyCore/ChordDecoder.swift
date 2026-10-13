@@ -27,6 +27,13 @@ public struct ChordSegment: Codable, Hashable, Sendable {
     public var typeIndex: Int
 
     public var isNoChord: Bool { root < 0 }
+
+    public init(start: Double, end: Double, root: Int, typeIndex: Int) {
+        self.start = start
+        self.end = end
+        self.root = root
+        self.typeIndex = typeIndex
+    }
 }
 
 public enum ChordDecoder {
@@ -109,6 +116,7 @@ public enum ChordDecoder {
 
     public static func segments(path: [Int], candidates: [ChordCandidate], fps: Double) -> [ChordSegment] {
         var out = [ChordSegment]()
+        guard !path.isEmpty else { return out }
         var start = 0
         for t in 1...path.count where t == path.count || path[t] != path[start] {
             let c = candidates[path[start]]

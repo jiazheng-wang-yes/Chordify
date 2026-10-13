@@ -207,9 +207,9 @@ public final class Analyzer: @unchecked Sendable {
     public func beatTimes(_ audio: [Float]) throws -> (beats: [Double], downbeats: [Double]) {
         let mel = try melModel.get().run(["audio": .init(data: audio, shape: [audio.count])], outputs: ["spect"])["spect"]!
         let frames = mel.shape[0]
-        let beatModel = try beatModel.get()
+        let tracker = try self.beatModel.get()
         let (b, d) = try BeatTracking.logits(spect: mel.data, frames: frames) { x, len in
-            let o = try beatModel.run(["spect": .init(data: x, shape: [1, len, 128])], outputs: ["beat", "downbeat"])
+            let o = try tracker.run(["spect": .init(data: x, shape: [1, len, 128])], outputs: ["beat", "downbeat"])
             return (o["beat"]!.data, o["downbeat"]!.data)
         }
         let raw = BeatTracking.postprocess(beat: b, downbeat: d)

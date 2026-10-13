@@ -29,6 +29,11 @@ public struct MusicalKey: Codable, Hashable, Sendable {
     public var tonic: Int
     public var minor: Bool
 
+    public init(tonic: Int, minor: Bool) {
+        self.tonic = tonic
+        self.minor = minor
+    }
+
     /// Flat-side keys are spelled with flats, sharp-side keys with sharps,
     /// C major / A minor with the usual lead-sheet mix.
     public var prefersFlats: Bool? {
