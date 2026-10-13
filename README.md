@@ -20,7 +20,8 @@ Everything runs on your Mac (Apple silicon, macOS 14 or later). Nothing is uploa
   qualities, 9/11/13 extensions, altered dominants (`7♭9`, `7♯9`, `7♯11`,
   `7♭13`, `7alt`, `13♭9`, `13♯11`, ...), `m(maj7)`, `maj7♯5`, `m7♭5`, `°7`, and
   inversions/slash chords. Switch to **Simple** to see the same song as
-  triads and sevenths.
+  triads and sevenths. The **Extensions** setting (Fewer / Normal / More)
+  sets how readily 9ths, 11ths and 13ths are reported; changing it is instant.
 - **MIDI export.** A type-1 MIDI file with a chord track (voice-led
   voicings), a bass track, chord names as markers, and a tempo map built from
   the detected beats, with a time signature per detected bar. Drop it into
@@ -114,15 +115,30 @@ predicts beats and downbeats, so the grid shows real bars (including
 
 **Decoding.** The Viterbi search is the same recursion as lv-chordia's
 `XHMMDecoder`; the Python version in `tools/convert/reference_pipeline.py` gives
-identical labels. The only change is that a chord change costs less on a
-detected beat, which keeps changes on the beat without forbidding anticipations.
+identical labels. Two things were added. First, a chord change costs less on
+a detected beat, which keeps changes on the beat without forbidding
+anticipations. Second, there is a small bonus for each 9th, 11th and 13th (the
+Extensions setting). The network was trained mostly on pop songs, and without
+the bonus it reports a jazz voicing like Dm9 or G13♭9 as Dm7 or G7. On a
+synthetic ii–V–I test, the default bonus raised exact matches from 6/16 to 9/16
+chords and added no extensions to a pop song.
 
 **Key.** Krumhansl–Kessler key profiles correlated with the duration-weighted
 chord tones. It is used to choose ♭ or ♯ spellings.
 
 **Size.** Models: chord ensemble 5.7 MB, beat tracker 43 MB (weights stored
 as float16, run in float32), CQT/mel front ends 4.5 MB. ONNX Runtime is
-linked statically. The whole app is about 70 MB.
+linked statically. The app bundle is 83 MB (53 MB zipped).
+
+### Command line
+
+The app binary also works in the terminal:
+
+```bash
+/Applications/Chordify.app/Contents/MacOS/Chordify --analyze song.mp3 --midi song.mid
+```
+
+It prints the key, tempo, tuning and the chord chart bar by bar.
 
 ## Repository layout
 
@@ -161,5 +177,6 @@ SVM, and the poster are kept in [`legacy/2023-cs545-svm`](legacy/2023-cs545-svm)
 
 ## Licenses
 
-App code: same as this repository. Chord model weights: MIT (lv-chordia /
-Music X Lab). Beat model weights: MIT (CPJKU). ONNX Runtime: MIT.
+Third-party parts: chord model weights, MIT (lv-chordia / Music X Lab); beat
+model weights, MIT (CPJKU); ONNX Runtime, MIT. This repository has no license
+file of its own yet.
