@@ -39,8 +39,10 @@ def expand_vocab(vocab):
     return cands
 
 
-def chord_obs(probs, cands):
-    """log-likelihood of every candidate at every frame (T, C)."""
+def chord_obs(probs, cands, extension_boost=0.0):
+    """log-likelihood of every candidate at every frame (T, C).  `extension_boost`
+    is added once for each 9th / 11th / 13th a candidate contains: the network
+    was trained mostly on pop songs and is conservative with extensions."""
     eps = 1e-12
     logs = [np.log(np.maximum(p, eps)) for p in probs]
     arr = np.array([c[3] for c in cands])
@@ -49,6 +51,9 @@ def chord_obs(probs, cands):
         col = arr[:, 2 + i]
         ok = col >= 0
         obs[:, ok] += logs[2 + i][:, col[ok]]
+    if extension_boost:
+        n_ext = ((arr[:, 3] > 0).astype(np.float32) + (arr[:, 4] > 0) + (arr[:, 5] > 0)).astype(np.float32)
+        obs += np.float32(extension_boost) * n_ext[None, :]
     return obs
 
 
@@ -182,6 +187,7 @@ def clean_downbeats(beats, downbeats):
 # ---------------------------------------------------------------- pipeline
 OFF_BEAT_PENALTY = 50.0
 ON_BEAT_PENALTY = 25.0
+EXTENSION_BOOST = 1.0
 
 
 def run(models_dir, audio_path, change_penalty=OFF_BEAT_PENALTY, beat_penalty=ON_BEAT_PENALTY):
@@ -203,7 +209,7 @@ def run(models_dir, audio_path, change_penalty=OFF_BEAT_PENALTY, beat_penalty=ON
     t2 = time.time()
     vocab = json.load(open(f"{models_dir}/chord_vocab.json"))
     cands = expand_vocab(vocab)
-    obs = chord_obs(probs, cands)
+    obs = chord_obs(probs, cands, EXTENSION_BOOST)
     pen = np.full(len(obs), change_penalty)
     if beat_penalty is not None:
         pen = beat_change_penalties(len(obs), beats, change_penalty, beat_penalty)

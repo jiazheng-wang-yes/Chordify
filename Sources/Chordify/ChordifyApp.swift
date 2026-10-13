@@ -55,6 +55,9 @@ struct ChordifyApp: App {
                 .pickerStyle(.inline)
                 Button("Toggle Jazz / Simple") { model.style = model.style == .jazz ? .simple : .jazz }
                     .keyboardShortcut("j")
+                Picker("Extensions (9, 11, 13)", selection: Bindable(model).extensions) {
+                    ForEach(AppModel.Extensions.allCases) { Text($0.title).tag($0) }
+                }
                 Divider()
                 Button("Transpose Up") { model.transpose = min(11, model.transpose + 1) }
                     .keyboardShortcut(.upArrow, modifiers: [.command])

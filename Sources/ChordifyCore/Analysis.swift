@@ -15,6 +15,8 @@ public struct SongAnalysis: Codable, Sendable {
     public var tuningCents: Double
     /// Peak-normalised loudness envelope (RMS), for drawing the waveform.
     public var envelope: [Float] = []
+    /// Extension boost used to decode `segments`.
+    public var extensionBoost: Float = Analyzer.defaultExtensionBoost
 
     public var tempo: Double? {
         guard beats.count > 2 else { return nil }
@@ -115,6 +117,7 @@ public final class Analyzer: @unchecked Sendable {
     public static let chordHop = 512.0
     public static let offBeatPenalty: Float = 50
     public static let onBeatPenalty: Float = 25
+    public static let defaultExtensionBoost: Float = 1
 
     public enum Stage: String, Sendable {
         case decoding = "Reading audio"
@@ -138,7 +141,10 @@ public final class Analyzer: @unchecked Sendable {
         candidates = vocabulary.candidates(.jazz)
     }
 
-    public func analyze(url: URL, progress: @escaping @Sendable (Stage) -> Void = { _ in }) throws -> SongAnalysis {
+    public func analyze(url: URL, extensionBoost: Float = Analyzer.defaultExtensionBoost,
+                        progress: @escaping @Sendable (Stage) -> Void = { _ in }) throws
+        -> (analysis: SongAnalysis, probabilities: ChordProbabilities)
+    {
         lock.lock()
         defer { lock.unlock() }
         progress(.decoding)
@@ -165,10 +171,20 @@ public final class Analyzer: @unchecked Sendable {
         let (beats, downbeats) = try beatTimes(audio)
 
         progress(.finishing)
-        let segments = decode(probs, beats: beats)
+        let segments = decode(probs, beats: beats, extensionBoost: extensionBoost)
         let key = MusicalKey.estimate(segments: segments, vocabulary: vocabulary)
-        return SongAnalysis(duration: duration, segments: segments, beats: beats, downbeats: downbeats,
-                            key: key, tuningCents: cents, envelope: Self.envelope(audio))
+        let a = SongAnalysis(duration: duration, segments: segments, beats: beats, downbeats: downbeats,
+                             key: key, tuningCents: cents, envelope: Self.envelope(audio), extensionBoost: extensionBoost)
+        return (a, probs)
+    }
+
+    /// Re-decode an analysis with another extension boost (fast: no network).
+    public func redecode(_ a: SongAnalysis, probabilities: ChordProbabilities, extensionBoost: Float) -> SongAnalysis {
+        var b = a
+        b.segments = decode(probabilities, beats: a.beats, extensionBoost: extensionBoost)
+        b.key = MusicalKey.estimate(segments: b.segments, vocabulary: vocabulary)
+        b.extensionBoost = extensionBoost
+        return b
     }
 
     static func envelope(_ x: [Float], points: Int = 1200) -> [Float] {
@@ -187,8 +203,9 @@ public final class Analyzer: @unchecked Sendable {
         return peak > 0 ? env.map { $0 / peak } : env
     }
 
-    public func decode(_ probs: ChordProbabilities, beats: [Double]) -> [ChordSegment] {
-        let obs = ChordDecoder.observations(probs, candidates: candidates)
+    public func decode(_ probs: ChordProbabilities, beats: [Double],
+                       extensionBoost: Float = Analyzer.defaultExtensionBoost) -> [ChordSegment] {
+        let obs = ChordDecoder.observations(probs, candidates: candidates, extensionBoost: extensionBoost)
         let pen = ChordDecoder.beatPenalties(frames: probs.frames, fps: probs.fps, beats: beats,
                                              offBeat: Self.offBeatPenalty, onBeat: Self.onBeatPenalty)
         let path = ChordDecoder.viterbi(observations: obs, states: candidates.count, changePenalty: pen)
@@ -254,5 +271,34 @@ public enum AnalysisCache {
         if let data = try? JSONEncoder().encode(a) {
             try? data.write(to: directory.appendingPathComponent(key + ".json"))
         }
+    }
+
+    /// Network output, kept so that decoding settings can change without re-analysis.
+    /// Layout: frames (Int64), fps (Float64), then the six heads as float32.
+    public static func store(_ p: ChordProbabilities, key: String) {
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var data = Data()
+        withUnsafeBytes(of: Int64(p.frames)) { data.append(contentsOf: $0) }
+        withUnsafeBytes(of: p.fps) { data.append(contentsOf: $0) }
+        for h in p.heads { h.withUnsafeBytes { data.append(contentsOf: $0) } }
+        try? data.write(to: directory.appendingPathComponent(key + ".probs"))
+    }
+
+    public static func loadProbabilities(_ key: String) -> ChordProbabilities? {
+        guard let data = try? Data(contentsOf: directory.appendingPathComponent(key + ".probs")), data.count >= 16 else { return nil }
+        let frames = Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 0, as: Int64.self) })
+        let fps = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 8, as: Double.self) }
+        let total = ChordProbabilities.headSizes.reduce(0, +) * frames
+        guard frames > 0, data.count == 16 + total * 4 else { return nil }
+        let floats: [Float] = data.withUnsafeBytes { raw in
+            (0..<total).map { raw.loadUnaligned(fromByteOffset: 16 + $0 * 4, as: Float.self) }
+        }
+        var heads = [[Float]]()
+        var o = 0
+        for size in ChordProbabilities.headSizes {
+            heads.append(Array(floats[o..<(o + size * frames)]))
+            o += size * frames
+        }
+        return ChordProbabilities(frames: frames, heads: heads, fps: fps)
     }
 }

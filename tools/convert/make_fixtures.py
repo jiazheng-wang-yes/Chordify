@@ -49,13 +49,16 @@ def main():
     downbeats = rp.clean_downbeats(beats, raw_downbeats)
 
     viterbi_cases = []
-    for name, pen in [
-        ("constant30", np.full(n_frames, 30.0)),
-        ("beats", rp.beat_change_penalties(n_frames, beats, rp.OFF_BEAT_PENALTY, rp.ON_BEAT_PENALTY)),
+    beat_pen = rp.beat_change_penalties(n_frames, beats, rp.OFF_BEAT_PENALTY, rp.ON_BEAT_PENALTY)
+    for name, pen, boost in [
+        ("constant30", np.full(n_frames, 30.0), 0.0),
+        ("beats", beat_pen, 0.0),
+        ("beats_boost", beat_pen, 2.0),
     ]:
-        path = rp.viterbi(obs, pen)
+        path = rp.viterbi(rp.chord_obs(probs, cands, boost) if boost else obs, pen)
         viterbi_cases.append({
             "name": name,
+            "boost": boost,
             "penalty": [float(p) if np.isfinite(p) else 1e30 for p in pen],
             "segments": [[s, e, n] for s, e, n in rp.segments(path, names, rp.CHORD_FPS)],
         })

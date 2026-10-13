@@ -5,6 +5,7 @@ import XCTest
 struct Fixtures: Decodable {
     struct ViterbiCase: Decodable {
         let name: String
+        let boost: Double
         let penalty: [Double]
         let segments: [[Segment]]
     }
@@ -96,8 +97,8 @@ final class ChordifyCoreTests: XCTestCase {
     func testViterbiMatchesReference() throws {
         let p = try probabilities()
         let c = vocab.candidates(.jazz)
-        let obs = ChordDecoder.observations(p, candidates: c)
         for vc in fx.viterbi {
+            let obs = ChordDecoder.observations(p, candidates: c, extensionBoost: Float(vc.boost))
             let pen = vc.penalty.map { Float($0) }
             let path = ChordDecoder.viterbi(observations: obs, states: c.count, changePenalty: pen)
             let segs = ChordDecoder.segments(path: path, candidates: c, fps: p.fps)

@@ -59,7 +59,7 @@ final class EndToEndTests: XCTestCase {
     func testWholeSong() throws {
         let analyzer = try Analyzer(modelsDirectory: Paths.models)
         let t0 = Date()
-        let a = try analyzer.analyze(url: Paths.sample)
+        let (a, probs) = try analyzer.analyze(url: Paths.sample)
         let elapsed = Date().timeIntervalSince(t0)
         print(String(format: "whole song (%.0f s): %.1f s, tuning %+.1f cents, key %@, tempo %.1f, %d chords",
                      a.duration, elapsed, a.tuningCents, a.key?.name() ?? "-", a.tempo ?? 0, a.segments.count))
@@ -70,6 +70,8 @@ final class EndToEndTests: XCTestCase {
         let v = analyzer.vocabulary
         let text = a.segments.prefix(30).map { v.symbol(for: $0, style: .jazz, transpose: 0, preferFlats: a.key?.prefersFlats).text }
         print(text.joined(separator: " "))
+        let plain = analyzer.redecode(a, probabilities: probs, extensionBoost: 0)
+        XCTAssertGreaterThan(plain.segments.count, 40)
         let midi = MIDIExport.data(for: a, vocabulary: v)
         XCTAssertGreaterThan(midi.count, 1000)
         let out = FileManager.default.temporaryDirectory.appendingPathComponent("chordify-test.mid")

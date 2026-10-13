@@ -29,12 +29,26 @@ final class AppModel {
     var speed: Double = 1 { didSet { player.rate = Float(speed) } }
 
     // display
+    enum Extensions: Float, CaseIterable, Identifiable {
+        case asTrained = 0, normal = 1, rich = 2
+        var id: Float { rawValue }
+        var title: String {
+            switch self {
+            case .asTrained: return "Fewer (as trained)"
+            case .normal: return "Normal"
+            case .rich: return "More (rich harmony)"
+            }
+        }
+    }
+    var extensions: Extensions = .normal { didSet { if extensions != oldValue { redecode() } } }
     var style: ChordStyle = .jazz
     var transpose = 0 { didSet { applyPitch() } }
     var shiftAudio = true { didSet { applyPitch() } }
 
     private(set) var vocabulary: ChordVocabulary?
     private var analyzer: Analyzer?
+    private var probabilities: ChordProbabilities?
+    private var cacheKey: String?
     private let player = Player()
     private var timer: Timer?
     private var analysisTask: Task<Void, Never>?
@@ -108,17 +122,29 @@ final class AppModel {
             guard let analyzer else { return }
             let key = AnalysisCache.key(for: url)
             var result = key.flatMap(AnalysisCache.load)
-            if result == nil {
-                result = try await Task.detached(priority: .userInitiated) {
-                    try analyzer.analyze(url: url) { stage in
+            var probs = key.flatMap(AnalysisCache.loadProbabilities)
+            if result == nil || probs == nil {
+                let boost = extensions.rawValue
+                let out = try await Task.detached(priority: .userInitiated) {
+                    try analyzer.analyze(url: url, extensionBoost: boost) { stage in
                         Task { @MainActor [weak self] in
                             if case .analyzing = self?.phase { self?.phase = .analyzing(stage) }
                         }
                     }
                 }.value
-                if let key, let result { AnalysisCache.store(result, key: key) }
+                result = out.analysis
+                probs = out.probabilities
+                if let key {
+                    AnalysisCache.store(out.analysis, key: key)
+                    AnalysisCache.store(out.probabilities, key: key)
+                }
             }
-            guard !Task.isCancelled, fileURL == url, let result else { return }
+            guard !Task.isCancelled, fileURL == url, var result else { return }
+            probabilities = probs
+            cacheKey = key
+            if let probs, result.extensionBoost != extensions.rawValue {
+                result = analyzer.redecode(result, probabilities: probs, extensionBoost: extensions.rawValue)
+            }
             analysis = result
             grid = BarGrid(analysis: result)
             phase = .ready
@@ -127,6 +153,16 @@ final class AppModel {
             guard fileURL == url else { return }
             phase = .failed(error.localizedDescription)
         }
+    }
+
+    /// Decode again with the current extension setting (no network run).
+    private func redecode() {
+        guard let a = analysis, let p = probabilities, let analyzer else { return }
+        let updated = analyzer.redecode(a, probabilities: p, extensionBoost: extensions.rawValue)
+        analysis = updated
+        grid = BarGrid(analysis: updated)
+        if let cacheKey { AnalysisCache.store(updated, key: cacheKey) }
+        updatePosition()
     }
 
     func showOpenPanel() {

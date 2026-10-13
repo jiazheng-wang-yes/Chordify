@@ -38,13 +38,18 @@ public struct ChordSegment: Codable, Hashable, Sendable {
 
 public enum ChordDecoder {
     /// Log-likelihood of every candidate at every frame, laid out (frame, candidate).
-    /// Same as XHMMDecoder.get_chord_tag_obs.
-    public static func observations(_ p: ChordProbabilities, candidates: [ChordCandidate]) -> [Float] {
+    /// Same as XHMMDecoder.get_chord_tag_obs, plus `extensionBoost` once for
+    /// every 9th / 11th / 13th in the candidate (the network, trained mostly
+    /// on pop songs, is conservative with extensions).
+    public static func observations(_ p: ChordProbabilities, candidates: [ChordCandidate], extensionBoost: Float = 0) -> [Float] {
         let n = candidates.count
         let sizes = ChordProbabilities.headSizes
         var logs = [[Float]]()
         for h in 0..<6 {
             logs.append(p.heads[h].map { logf(max($0, 1e-12)) })
+        }
+        let bonus = candidates.map { c -> Float in
+            extensionBoost * Float((3...5).filter { c.heads[$0] > 0 }.count)
         }
         var obs = [Float](repeating: 0, count: p.frames * n)
         obs.withUnsafeMutableBufferPointer { out in
@@ -56,7 +61,7 @@ public enum ChordDecoder {
                         let k = cand.heads[h]
                         if k >= 0 { s += logs[h][t * sizes[h] + k] }
                     }
-                    out[row + c] = s
+                    out[row + c] = extensionBoost == 0 ? s : s + bonus[c]
                 }
             }
         }

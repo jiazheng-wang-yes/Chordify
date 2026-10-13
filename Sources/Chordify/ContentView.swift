@@ -139,6 +139,16 @@ extension ContentView {
                 .pickerStyle(.segmented)
                 .help("Jazz shows every extension and slash bass (\u{2318}J)")
 
+                Menu {
+                    Picker("Extensions", selection: Bindable(model).extensions) {
+                        ForEach(AppModel.Extensions.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.inline)
+                } label: {
+                    Label("Extensions", systemImage: "slider.horizontal.3")
+                }
+                .help("How readily 9ths, 11ths and 13ths are reported")
+
                 TransposeControl()
 
                 Menu {
