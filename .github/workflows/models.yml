@@ -1,0 +1,41 @@
+name: Convert models
+
+# Rebuilds Models/ (ONNX files + chord vocabulary) and the Swift test fixtures
+# from the upstream projects, checks them against the original PyTorch code,
+# and commits the result back to the branch.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/convert/**"
+      - ".github/workflows/models.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: models-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu torch torchaudio
+          pip install -r tools/convert/requirements.txt
+      - name: Convert and verify
+        run: bash tools/convert/make_models.sh Models
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Models Tests/ChordifyCoreTests/Fixtures
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "Regenerate models and test fixtures"
+          git push

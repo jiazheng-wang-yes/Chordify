@@ -1,0 +1,14 @@
+torch>=2.4
+torchaudio>=2.4
+librosa>=0.11
+onnx>=1.16
+onnxruntime>=1.20
+numpy
+soundfile
+soxr
+einops
+rotary-embedding-torch
+mir_eval
+pretty_midi
+pydub
+audioop-lts; python_version >= "3.13"
