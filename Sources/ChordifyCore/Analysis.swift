@@ -132,7 +132,10 @@ public final class Analyzer: @unchecked Sendable {
     private let modelsDir: URL
     private lazy var chordModel = Result { try OnnxModel(url: modelsDir.appendingPathComponent("chordnet.onnx")) }
     private lazy var melModel = Result { try OnnxModel(url: modelsDir.appendingPathComponent("beat_mel.onnx")) }
-    private lazy var beatModel = Result { try OnnxModel(url: modelsDir.appendingPathComponent("beat_this.onnx")) }
+    private lazy var beatModel = Result {
+        try OnnxModel(url: modelsDir.appendingPathComponent("beat_this.onnx"),
+                      coreMLUnits: ProcessInfo.processInfo.environment["CHORDIFY_COREML"])
+    }
     private let lock = NSLock()
 
     public init(modelsDirectory: URL? = nil) throws {

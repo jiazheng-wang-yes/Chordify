@@ -2,7 +2,19 @@ import AppKit
 import ChordifyCore
 import SwiftUI
 
+/// `Chordify --analyze song.mp3 [--midi out.mid]` runs the analysis in the
+/// terminal; anything else starts the app.
 @main
+enum Entry {
+    static func main() {
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--analyze"), i + 1 < args.count {
+            exit(CommandLineTool.run(args))
+        }
+        ChordifyApp.main()
+    }
+}
+
 struct ChordifyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel.shared
