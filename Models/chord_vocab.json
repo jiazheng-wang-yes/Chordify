@@ -1,0 +1,1537 @@
+{
+ "source": "Jiang et al., ISMIR 2019 chord structure decomposition",
+ "types": [
+  {
+   "harte": "maj",
+   "model": [
+    1,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7
+   ],
+   "bass": 0,
+   "jazz": "",
+   "simple": "",
+   "pop": true
+  },
+  {
+   "harte": "min",
+   "model": [
+    13,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    7
+   ],
+   "bass": 0,
+   "jazz": "m",
+   "simple": "m",
+   "pop": true
+  },
+  {
+   "harte": "dim",
+   "model": [
+    49,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    6
+   ],
+   "bass": 0,
+   "jazz": "°",
+   "simple": "°",
+   "pop": true
+  },
+  {
+   "harte": "aug",
+   "model": [
+    61,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    8
+   ],
+   "bass": 0,
+   "jazz": "+",
+   "simple": "+",
+   "pop": true
+  },
+  {
+   "harte": "sus4",
+   "model": [
+    25,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    5,
+    7
+   ],
+   "bass": 0,
+   "jazz": "sus4",
+   "simple": "sus4",
+   "pop": true
+  },
+  {
+   "harte": "sus2",
+   "model": [
+    37,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    7
+   ],
+   "bass": 0,
+   "jazz": "sus2",
+   "simple": "sus2",
+   "pop": true
+  },
+  {
+   "harte": "maj6",
+   "model": [
+    1,
+    0,
+    0,
+    0,
+    0,
+    1
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    9
+   ],
+   "bass": 0,
+   "jazz": "6",
+   "simple": "",
+   "pop": true
+  },
+  {
+   "harte": "min6",
+   "model": [
+    13,
+    0,
+    0,
+    0,
+    0,
+    1
+   ],
+   "tones": [
+    0,
+    3,
+    7,
+    9
+   ],
+   "bass": 0,
+   "jazz": "m6",
+   "simple": "m",
+   "pop": true
+  },
+  {
+   "harte": "maj6(9)",
+   "model": [
+    1,
+    0,
+    0,
+    1,
+    0,
+    1
+   ],
+   "tones": [
+    0,
+    2,
+    4,
+    7,
+    9
+   ],
+   "bass": 0,
+   "jazz": "6/9",
+   "simple": "",
+   "pop": false
+  },
+  {
+   "harte": "min6(9)",
+   "model": [
+    13,
+    0,
+    0,
+    1,
+    0,
+    1
+   ],
+   "tones": [
+    0,
+    2,
+    3,
+    7,
+    9
+   ],
+   "bass": 0,
+   "jazz": "m6/9",
+   "simple": "m",
+   "pop": false
+  },
+  {
+   "harte": "maj(9)",
+   "model": [
+    1,
+    0,
+    0,
+    1,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    4,
+    7
+   ],
+   "bass": 0,
+   "jazz": "add9",
+   "simple": "",
+   "pop": false
+  },
+  {
+   "harte": "min(9)",
+   "model": [
+    13,
+    0,
+    0,
+    1,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    3,
+    7
+   ],
+   "bass": 0,
+   "jazz": "m(add9)",
+   "simple": "m",
+   "pop": false
+  },
+  {
+   "harte": "7",
+   "model": [
+    1,
+    0,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "7",
+   "simple": "7",
+   "pop": true
+  },
+  {
+   "harte": "maj7",
+   "model": [
+    1,
+    0,
+    1,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    11
+   ],
+   "bass": 0,
+   "jazz": "maj7",
+   "simple": "maj7",
+   "pop": true
+  },
+  {
+   "harte": "min7",
+   "model": [
+    13,
+    0,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "m7",
+   "simple": "m7",
+   "pop": true
+  },
+  {
+   "harte": "minmaj7",
+   "model": [
+    13,
+    0,
+    1,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    7,
+    11
+   ],
+   "bass": 0,
+   "jazz": "m(maj7)",
+   "simple": "m",
+   "pop": false
+  },
+  {
+   "harte": "dim7",
+   "model": [
+    49,
+    0,
+    3,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    6,
+    9
+   ],
+   "bass": 0,
+   "jazz": "°7",
+   "simple": "°7",
+   "pop": true
+  },
+  {
+   "harte": "hdim7",
+   "model": [
+    49,
+    0,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    6,
+    10
+   ],
+   "bass": 0,
+   "jazz": "m7♭5",
+   "simple": "m7♭5",
+   "pop": true
+  },
+  {
+   "harte": "aug(b7)",
+   "model": [
+    61,
+    0,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    8,
+    10
+   ],
+   "bass": 0,
+   "jazz": "7♯5",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "aug(7)",
+   "model": [
+    61,
+    0,
+    1,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    8,
+    11
+   ],
+   "bass": 0,
+   "jazz": "maj7♯5",
+   "simple": "maj7",
+   "pop": false
+  },
+  {
+   "harte": "sus4(b7)",
+   "model": [
+    25,
+    0,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    5,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "7sus4",
+   "simple": "7sus4",
+   "pop": true
+  },
+  {
+   "harte": "9",
+   "model": [
+    1,
+    0,
+    2,
+    1,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    4,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "9",
+   "simple": "7",
+   "pop": true
+  },
+  {
+   "harte": "maj9",
+   "model": [
+    1,
+    0,
+    1,
+    1,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    4,
+    7,
+    11
+   ],
+   "bass": 0,
+   "jazz": "maj9",
+   "simple": "maj7",
+   "pop": true
+  },
+  {
+   "harte": "min9",
+   "model": [
+    13,
+    0,
+    2,
+    1,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    3,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "m9",
+   "simple": "m7",
+   "pop": true
+  },
+  {
+   "harte": "minmaj7(9)",
+   "model": [
+    13,
+    0,
+    1,
+    1,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    3,
+    7,
+    11
+   ],
+   "bass": 0,
+   "jazz": "m(maj9)",
+   "simple": "m",
+   "pop": false
+  },
+  {
+   "harte": "hdim7(9)",
+   "model": [
+    49,
+    0,
+    2,
+    1,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    3,
+    6,
+    10
+   ],
+   "bass": 0,
+   "jazz": "m9♭5",
+   "simple": "m7♭5",
+   "pop": false
+  },
+  {
+   "harte": "7(b9)",
+   "model": [
+    1,
+    0,
+    2,
+    3,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    1,
+    4,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "7♭9",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "7(#9)",
+   "model": [
+    1,
+    0,
+    2,
+    2,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    4,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "7♯9",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "sus4(b7,9)",
+   "model": [
+    25,
+    0,
+    2,
+    1,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    5,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "9sus4",
+   "simple": "7sus4",
+   "pop": false
+  },
+  {
+   "harte": "11",
+   "model": [
+    1,
+    0,
+    2,
+    1,
+    1,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    4,
+    5,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "11",
+   "simple": "7",
+   "pop": true
+  },
+  {
+   "harte": "min11",
+   "model": [
+    13,
+    0,
+    2,
+    1,
+    1,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    3,
+    5,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "m11",
+   "simple": "m7",
+   "pop": false
+  },
+  {
+   "harte": "min7(11)",
+   "model": [
+    13,
+    0,
+    2,
+    0,
+    1,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    5,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "m7(add11)",
+   "simple": "m7",
+   "pop": false
+  },
+  {
+   "harte": "7(#11)",
+   "model": [
+    1,
+    0,
+    2,
+    0,
+    2,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    6,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "7♯11",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "9(#11)",
+   "model": [
+    1,
+    0,
+    2,
+    1,
+    2,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    4,
+    6,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "9♯11",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "maj7(#11)",
+   "model": [
+    1,
+    0,
+    1,
+    0,
+    2,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    6,
+    7,
+    11
+   ],
+   "bass": 0,
+   "jazz": "maj7♯11",
+   "simple": "maj7",
+   "pop": false
+  },
+  {
+   "harte": "maj9(#11)",
+   "model": [
+    1,
+    0,
+    1,
+    1,
+    2,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    4,
+    6,
+    7,
+    11
+   ],
+   "bass": 0,
+   "jazz": "maj9♯11",
+   "simple": "maj7",
+   "pop": false
+  },
+  {
+   "harte": "7(b9,#11)",
+   "model": [
+    1,
+    0,
+    2,
+    3,
+    2,
+    0
+   ],
+   "tones": [
+    0,
+    1,
+    4,
+    6,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "7♭9♯11",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "13",
+   "model": [
+    1,
+    0,
+    2,
+    1,
+    1,
+    1
+   ],
+   "tones": [
+    0,
+    2,
+    4,
+    5,
+    7,
+    9,
+    10
+   ],
+   "bass": 0,
+   "jazz": "13",
+   "simple": "7",
+   "pop": true
+  },
+  {
+   "harte": "min13",
+   "model": [
+    13,
+    0,
+    2,
+    1,
+    1,
+    1
+   ],
+   "tones": [
+    0,
+    2,
+    3,
+    5,
+    7,
+    9,
+    10
+   ],
+   "bass": 0,
+   "jazz": "m13",
+   "simple": "m7",
+   "pop": false
+  },
+  {
+   "harte": "maj13",
+   "model": [
+    1,
+    0,
+    1,
+    1,
+    1,
+    1
+   ],
+   "tones": [
+    0,
+    2,
+    4,
+    5,
+    7,
+    9,
+    11
+   ],
+   "bass": 0,
+   "jazz": "maj13",
+   "simple": "maj7",
+   "pop": false
+  },
+  {
+   "harte": "7(13)",
+   "model": [
+    1,
+    0,
+    2,
+    0,
+    0,
+    1
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    9,
+    10
+   ],
+   "bass": 0,
+   "jazz": "7(13)",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "9(13)",
+   "model": [
+    1,
+    0,
+    2,
+    1,
+    0,
+    1
+   ],
+   "tones": [
+    0,
+    2,
+    4,
+    7,
+    9,
+    10
+   ],
+   "bass": 0,
+   "jazz": "13",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "13(#11)",
+   "model": [
+    1,
+    0,
+    2,
+    1,
+    2,
+    1
+   ],
+   "tones": [
+    0,
+    2,
+    4,
+    5,
+    6,
+    7,
+    9,
+    10
+   ],
+   "bass": 0,
+   "jazz": "13♯11",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "7(b13)",
+   "model": [
+    1,
+    0,
+    2,
+    0,
+    0,
+    2
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    8,
+    10
+   ],
+   "bass": 0,
+   "jazz": "7♭13",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "7(b9,b13)",
+   "model": [
+    1,
+    0,
+    2,
+    3,
+    0,
+    2
+   ],
+   "tones": [
+    0,
+    1,
+    4,
+    7,
+    8,
+    10
+   ],
+   "bass": 0,
+   "jazz": "7♭9♭13",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "7(#9,b13)",
+   "model": [
+    1,
+    0,
+    2,
+    2,
+    0,
+    2
+   ],
+   "tones": [
+    0,
+    3,
+    4,
+    7,
+    8,
+    10
+   ],
+   "bass": 0,
+   "jazz": "7alt",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "7(b9,13)",
+   "model": [
+    1,
+    0,
+    2,
+    3,
+    0,
+    1
+   ],
+   "tones": [
+    0,
+    1,
+    4,
+    7,
+    9,
+    10
+   ],
+   "bass": 0,
+   "jazz": "13♭9",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "7(#9,#11)",
+   "model": [
+    1,
+    0,
+    2,
+    2,
+    2,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    4,
+    6,
+    7,
+    10
+   ],
+   "bass": 0,
+   "jazz": "7♯9♯11",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "min7(b13)",
+   "model": [
+    13,
+    0,
+    2,
+    0,
+    0,
+    2
+   ],
+   "tones": [
+    0,
+    3,
+    7,
+    8,
+    10
+   ],
+   "bass": 0,
+   "jazz": "m7♭13",
+   "simple": "m7",
+   "pop": false
+  },
+  {
+   "harte": "sus4(b7,9,13)",
+   "model": [
+    25,
+    0,
+    2,
+    1,
+    0,
+    1
+   ],
+   "tones": [
+    0,
+    2,
+    5,
+    7,
+    9,
+    10
+   ],
+   "bass": 0,
+   "jazz": "13sus4",
+   "simple": "7sus4",
+   "pop": false
+  },
+  {
+   "harte": "maj/3",
+   "model": [
+    1,
+    4,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7
+   ],
+   "bass": 4,
+   "jazz": "",
+   "simple": "",
+   "pop": true
+  },
+  {
+   "harte": "maj/5",
+   "model": [
+    1,
+    7,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7
+   ],
+   "bass": 7,
+   "jazz": "",
+   "simple": "",
+   "pop": true
+  },
+  {
+   "harte": "maj/2",
+   "model": [
+    1,
+    2,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    2,
+    4,
+    7
+   ],
+   "bass": 2,
+   "jazz": "",
+   "simple": "",
+   "pop": true
+  },
+  {
+   "harte": "maj/4",
+   "model": [
+    1,
+    5,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    5,
+    7
+   ],
+   "bass": 5,
+   "jazz": "",
+   "simple": "",
+   "pop": true
+  },
+  {
+   "harte": "maj/b7",
+   "model": [
+    1,
+    10,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    10
+   ],
+   "bass": 10,
+   "jazz": "",
+   "simple": "",
+   "pop": true
+  },
+  {
+   "harte": "maj/7",
+   "model": [
+    1,
+    11,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    11
+   ],
+   "bass": 11,
+   "jazz": "",
+   "simple": "",
+   "pop": false
+  },
+  {
+   "harte": "min/b3",
+   "model": [
+    13,
+    3,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    7
+   ],
+   "bass": 3,
+   "jazz": "m",
+   "simple": "m",
+   "pop": true
+  },
+  {
+   "harte": "min/5",
+   "model": [
+    13,
+    7,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    7
+   ],
+   "bass": 7,
+   "jazz": "m",
+   "simple": "m",
+   "pop": true
+  },
+  {
+   "harte": "min/b7",
+   "model": [
+    13,
+    10,
+    0,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    7,
+    10
+   ],
+   "bass": 10,
+   "jazz": "m",
+   "simple": "m",
+   "pop": true
+  },
+  {
+   "harte": "7/3",
+   "model": [
+    1,
+    4,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    10
+   ],
+   "bass": 4,
+   "jazz": "7",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "7/5",
+   "model": [
+    1,
+    7,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    10
+   ],
+   "bass": 7,
+   "jazz": "7",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "7/b7",
+   "model": [
+    1,
+    10,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    10
+   ],
+   "bass": 10,
+   "jazz": "7",
+   "simple": "7",
+   "pop": false
+  },
+  {
+   "harte": "maj7/3",
+   "model": [
+    1,
+    4,
+    1,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    11
+   ],
+   "bass": 4,
+   "jazz": "maj7",
+   "simple": "maj7",
+   "pop": false
+  },
+  {
+   "harte": "maj7/5",
+   "model": [
+    1,
+    7,
+    1,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    11
+   ],
+   "bass": 7,
+   "jazz": "maj7",
+   "simple": "maj7",
+   "pop": false
+  },
+  {
+   "harte": "maj7/7",
+   "model": [
+    1,
+    11,
+    1,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    4,
+    7,
+    11
+   ],
+   "bass": 11,
+   "jazz": "maj7",
+   "simple": "maj7",
+   "pop": false
+  },
+  {
+   "harte": "min7/b3",
+   "model": [
+    13,
+    3,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    7,
+    10
+   ],
+   "bass": 3,
+   "jazz": "m7",
+   "simple": "m7",
+   "pop": false
+  },
+  {
+   "harte": "min7/5",
+   "model": [
+    13,
+    7,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    7,
+    10
+   ],
+   "bass": 7,
+   "jazz": "m7",
+   "simple": "m7",
+   "pop": false
+  },
+  {
+   "harte": "min7/b7",
+   "model": [
+    13,
+    10,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    7,
+    10
+   ],
+   "bass": 10,
+   "jazz": "m7",
+   "simple": "m7",
+   "pop": false
+  },
+  {
+   "harte": "sus4(b7)/b7",
+   "model": [
+    25,
+    10,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    5,
+    7,
+    10
+   ],
+   "bass": 10,
+   "jazz": "7sus4",
+   "simple": "7sus4",
+   "pop": false
+  },
+  {
+   "harte": "hdim7/b3",
+   "model": [
+    49,
+    3,
+    2,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    6,
+    10
+   ],
+   "bass": 3,
+   "jazz": "m7♭5",
+   "simple": "m7♭5",
+   "pop": false
+  },
+  {
+   "harte": "dim7/b3",
+   "model": [
+    49,
+    3,
+    3,
+    0,
+    0,
+    0
+   ],
+   "tones": [
+    0,
+    3,
+    6,
+    9
+   ],
+   "bass": 3,
+   "jazz": "°7",
+   "simple": "°7",
+   "pop": false
+  }
+ ]
+}
