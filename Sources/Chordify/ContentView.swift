@@ -20,6 +20,7 @@ struct ContentView: View {
                 SongView()
             }
         }
+        .tint(Theme.ink)
         .toolbar { toolbarItems }
         .navigationTitle(model.title.isEmpty ? "Chordify" : model.title)
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
@@ -43,10 +44,10 @@ struct EmptyStateView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8, 7]))
-                    .foregroundStyle(targeted ? Color.accentColor : Color.secondary.opacity(0.35))
+                    .foregroundStyle(targeted ? Theme.ink : Color.secondary.opacity(0.35))
                     .background(
                         RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .fill(targeted ? Color.accentColor.opacity(0.08) : Color.clear)
+                            .fill(targeted ? Theme.ink.opacity(0.08) : Color.clear)
                     )
                 VStack(spacing: 14) {
                     Image(systemName: "waveform.badge.magnifyingglass")
@@ -89,7 +90,7 @@ struct AnalyzingView: View {
                     HStack(spacing: 12) {
                         Group {
                             if index < current {
-                                Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.accentColor)
+                                Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.ink)
                             } else if index == current {
                                 ProgressView().controlSize(.small)
                             } else {
