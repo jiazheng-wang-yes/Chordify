@@ -6,6 +6,7 @@ You play the song and follow the chords bar by bar, then export everything as a
 MIDI file that lines up with the original recording.
 
 Everything runs on your Mac (Apple silicon, macOS 14 or later). Nothing is uploaded.
+Songs can also come from a link (YouTube and many other sites, beta).
 
 ## Features
 
@@ -29,9 +30,30 @@ Everything runs on your Mac (Apple silicon, macOS 14 or later). Nothing is uploa
   Logic, Ableton, etc. next to the original audio and it stays in sync.
 - **Practice tools.** Slow down to 50% without changing pitch, transpose
   chords (and optionally the audio) by semitones, jump chord by chord.
-- **Key, tempo, meter** shown for each song. Detuned recordings (for example
-  old records) are measured and corrected before chord recognition.
-- **Chord chart export** as text: bars with chords, plus timed chords in seconds.
+- **Key changes, tempo changes, meter changes.** The key, tempo and beats per
+  bar shown next to the chord follow the playhead. Bars where the key, tempo
+  or meter changes get a tag in the grid, and the changes are marked on the
+  waveform. MIDI files get a key signature at every modulation; chord charts
+  get a heading line.
+- **Nashville numbers.** A third chord style, "1 4 5", writes every chord as a
+  scale degree of the *local* key (`1`, `4`, `5⁷`, `6m`, `♭7`, `1/3`). It
+  restarts at each modulation, and it stays the same when you transpose. Minor
+  keys are numbered from the minor tonic (`1m ♭6 ♭7`), or, as an option in the
+  Chords menu, from the relative major (`6m 4 5`).
+- **Analyze a link (beta).** Paste a YouTube, SoundCloud, Bandcamp or Vimeo
+  link, any page with an audio or video element, or a direct link to an
+  audio file (⌘L, or drag a link from the browser onto the window). Direct
+  audio files are downloaded as they are. For other pages Chordify uses
+  [yt-dlp](https://github.com/yt-dlp/yt-dlp): it uses your copy if one is
+  installed (for example with Homebrew). Otherwise it downloads the official
+  macOS build once (about 35 MB), checks it against the SHA-256 sums published
+  with the release, and keeps it in `~/Library/Application Support/Chordify`.
+  YouTube changes often; if a YouTube link fails, `brew install yt-dlp`
+  usually fixes it. Only analyse recordings you are allowed to download.
+- **Detuned recordings** (for example old records) are measured and corrected
+  before chord recognition.
+- **Chord chart export** as text: bars with chords and key/tempo headings,
+  plus timed chords in seconds (in any of the three chord styles).
 
 ### Keyboard
 
@@ -42,8 +64,9 @@ Everything runs on your Mac (Apple silicon, macOS 14 or later). Nothing is uploa
 | ⌘← / ⌘→ | Previous / next chord |
 | `-` / `=` / `0` | Slower / faster / normal speed |
 | ⌘↑ / ⌘↓ | Transpose up / down |
-| ⌘J | Jazz / Simple chord symbols |
+| ⌘J | Next chord style: Jazz, Simple, Nashville numbers |
 | ⌘O | Open a song |
+| ⌘L | Open a link (beta) |
 | ⌘E / ⇧⌘E | Export MIDI / chord chart |
 
 ## Install
@@ -124,8 +147,31 @@ the bonus it reports a jazz voicing like Dm9 or G13♭9 as Dm7 or G7. On a
 synthetic ii–V–I test, the default bonus raised exact matches from 6/16 to 9/16
 chords and added no extensions to a pop song.
 
-**Key.** Krumhansl–Kessler key profiles correlated with the duration-weighted
-chord tones. It is used to choose ♭ or ♯ spellings.
+**Keys and modulations.** For every bar, the recognised chord tones of that
+bar and the two bars on each side are correlated with the 24 Krumhansl–Kessler
+key profiles. A Viterbi search over the bars then picks one key per bar. Each
+key change costs 3 (in correlation units summed over bars), and a change
+between relative major and minor costs 4.5. So a key must be clearly
+supported for several bars before it counts as a modulation, and a chorus on
+vi does not flip the key. On a synthetic song going C → E♭ → C → D, every
+modulation is found at the right bar. On the sample song (B major, with a
+G♯m-heavy chorus) no modulation is reported. The local key sets the ♭/♯
+spelling and the Nashville "1".
+
+**Tempo and meter changes.** The beat tracker sometimes switches metrical
+level in the middle of a song. On the sample song it counts eighth notes
+(193.5 BPM) for two minutes, then dotted quarters (64.5 BPM), while the bars
+stay 1.86 s long. Before looking for changes, Chordify first segments the beat
+period into constant pieces. Pieces related to a reference piece by 2×, 3×,
+½ or ⅓ are brought to the same level, and bars that hold k × the usual
+number of beats are split (missed downbeats). The per-bar tempo is then
+segmented again (optimal partitioning with a cost per section). A new
+section starts where the tempo really changes, or where the beats per bar
+change for at least two bars. On a synthetic song (4/4 at 120 with a level
+switch, 3/4 at 90, 4/4 at 90) this gives exactly those three sections. The
+sample song comes out as one section of 6 beats per bar. Every step has a
+Python twin in `tools/convert/reference_pipeline.py`, and the Swift tests
+check the two against each other.
 
 **Size.** Models: chord ensemble 5.7 MB, beat tracker 43 MB (weights stored
 as float16, run in float32), CQT/mel front ends 4.5 MB. ONNX Runtime is
@@ -139,7 +185,9 @@ The app binary also works in the terminal:
 /Applications/Chordify.app/Contents/MacOS/Chordify --analyze song.mp3 --midi song.mid
 ```
 
-It prints the key, tempo, tuning and the chord chart bar by bar.
+It prints the key and tempo sections, the tuning, and the chord chart bar by
+bar (`--nashville` for numbers). `--analyze-url <link>` does the same for a
+link.
 
 ## Repository layout
 

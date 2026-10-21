@@ -40,8 +40,8 @@ jobs:
           mkdir -p build/site
           afconvert -f m4af -d aac legacy/2023-cs545-svm/sample_audio.wav build/site/song.m4a
           printf '<html><head><title>Chordify link test</title></head><body><audio controls src="song.m4a"></audio></body></html>' > build/site/index.html
-          (cd build/site && python3 -m http.server 8765 >/dev/null 2>&1 &)
-          sleep 2
+          (cd build/site && python3 -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1 &)
+          for i in $(seq 1 20); do curl -sf -o /dev/null http://127.0.0.1:8765/index.html && break; sleep 1; done
           build/Chordify.app/Contents/MacOS/Chordify --analyze-url http://127.0.0.1:8765/index.html --nashville > build/link-page.txt
           head -40 build/link-page.txt
           build/Chordify.app/Contents/MacOS/Chordify --analyze-url http://127.0.0.1:8765/song.m4a > build/link-file.txt
