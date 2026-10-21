@@ -139,6 +139,16 @@ struct LinkSheet: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(width: 440, alignment: .leading)
+            Picker("Use sign-in from", selection: $model.cookieBrowser) {
+                Text("No browser").tag("")
+                Text("Safari").tag("safari")
+                Text("Chrome").tag("chrome")
+                Text("Firefox").tag("firefox")
+                Text("Brave").tag("brave")
+                Text("Edge").tag("edge")
+            }
+            .frame(width: 300)
+            .help("Only needed when a site asks to confirm you are not a bot. yt-dlp then reads that browser's cookies on this Mac (Safari needs Full Disk Access for Chordify).")
             HStack {
                 Spacer()
                 Button("Cancel") { model.showLinkSheet = false }

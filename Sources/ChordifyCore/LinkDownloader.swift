@@ -106,7 +106,9 @@ public final class LinkDownloader: @unchecked Sendable {
     // MARK: - fetching
 
     /// Downloads the audio of `url` (cached by URL).
-    public func fetch(_ url: URL, installIfNeeded: Bool,
+    /// `cookiesFromBrowser` ("safari", "chrome", "firefox", ...) lets yt-dlp use
+    /// that browser's sign-in, for sites that ask to confirm you are not a bot.
+    public func fetch(_ url: URL, installIfNeeded: Bool, cookiesFromBrowser: String? = nil,
                       progress: @escaping @Sendable (Progress) -> Void) async throws -> Result {
         lock.lock()
         cancelled = false
@@ -130,7 +132,8 @@ public final class LinkDownloader: @unchecked Sendable {
                 guard installIfNeeded else { throw ChordifyError.audio("yt-dlp is not installed.") }
                 tool = try await installTool { progress(.installingTool($0)) }
             }
-            result = try await runYTDLP(tool!, url: url, output: dir.appendingPathComponent("\(key).%(ext)s"), progress: progress)
+            result = try await runYTDLP(tool!, url: url, output: dir.appendingPathComponent("\(key).%(ext)s"),
+                                        cookies: cookiesFromBrowser, progress: progress)
         }
         let info = ["file": result.file.path, "title": result.title, "url": url.absoluteString]
         try? JSONEncoder().encode(info).write(to: meta)
@@ -165,7 +168,7 @@ public final class LinkDownloader: @unchecked Sendable {
         }
     }
 
-    static func arguments(url: URL, output: URL, ffmpeg: String?) -> [String] {
+    static func arguments(url: URL, output: URL, ffmpeg: String?, cookies: String? = nil) -> [String] {
         var args = ["--no-playlist", "--no-simulate", "--newline", "--no-colors", "--no-warnings",
                     "-f", "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio[acodec^=mp4a]/best[ext=mp4]/bestaudio/best",
                     "--progress", "--progress-template", "download:CHORDIFY_PROGRESS %(progress._percent_str)s",
@@ -176,14 +179,16 @@ public final class LinkDownloader: @unchecked Sendable {
             // with ffmpeg, any source format (Opus, WebM, ...) becomes AAC that Core Audio can read
             args += ["-x", "--audio-format", "m4a", "--ffmpeg-location", ffmpeg]
         }
+        if let cookies { args += ["--cookies-from-browser", cookies] }
         return args + ["--", url.absoluteString]
     }
 
-    private func runYTDLP(_ tool: URL, url: URL, output: URL, progress: @escaping @Sendable (Progress) -> Void) async throws -> Result {
+    private func runYTDLP(_ tool: URL, url: URL, output: URL, cookies: String?,
+                          progress: @escaping @Sendable (Progress) -> Void) async throws -> Result {
         progress(.resolving)
         let p = Process()
         p.executableURL = tool
-        p.arguments = Self.arguments(url: url, output: output, ffmpeg: Self.ffmpegDirectory())
+        p.arguments = Self.arguments(url: url, output: output, ffmpeg: Self.ffmpegDirectory(), cookies: cookies)
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/opt/local/bin:" + (env["PATH"] ?? "/usr/bin:/bin")
         p.environment = env
@@ -241,8 +246,10 @@ public final class LinkDownloader: @unchecked Sendable {
         guard p.terminationStatus == 0, let path = final.file, FileManager.default.fileExists(atPath: path) else {
             let message = state.errorText.split(separator: "\n").last(where: { $0.contains("ERROR") }).map(String.init)
                 ?? "yt-dlp could not fetch this link."
-            throw ChordifyError.audio(message.replacingOccurrences(of: "ERROR: ", with: "") +
-                "\n\nIf YouTube links fail, `brew install yt-dlp` gives a version with everything YouTube needs.")
+            let hint = message.contains("not a bot") || message.contains("Sign in")
+                ? "\n\nThe site wants a signed-in browser. Choose your browser under \u{201C}Use sign-in from\u{201D} and try again."
+                : "\n\nIf YouTube links fail, `brew install yt-dlp` gives a version with everything YouTube needs."
+            throw ChordifyError.audio(message.replacingOccurrences(of: "ERROR: ", with: "") + hint)
         }
         let file = URL(fileURLWithPath: path)
         let readable = ["m4a", "mp3", "mp4", "aac", "wav", "aiff", "flac", "caf", "m4b"]

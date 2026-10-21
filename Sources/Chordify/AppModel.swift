@@ -54,6 +54,10 @@ final class AppModel {
     // links (beta)
     var showLinkSheet = false
     var linkText = ""
+    /// Browser whose sign-in yt-dlp may use ("" = none).
+    var cookieBrowser = UserDefaults.standard.string(forKey: "cookieBrowser") ?? "" {
+        didSet { UserDefaults.standard.set(cookieBrowser, forKey: "cookieBrowser") }
+    }
     private let downloader = LinkDownloader()
     private var downloadTask: Task<Void, Never>?
 
@@ -201,9 +205,10 @@ final class AppModel {
         title = url.host ?? url.absoluteString
         phase = .downloading("Looking up the link", nil)
         let fetcher = self.downloader
+        let cookies = cookieBrowser.isEmpty ? nil : cookieBrowser
         downloadTask = Task { [weak self] in
             do {
-                let result = try await fetcher.fetch(url, installIfNeeded: true) { p in
+                let result = try await fetcher.fetch(url, installIfNeeded: true, cookiesFromBrowser: cookies) { p in
                     Task { @MainActor [weak self] in
                         guard let self, case .downloading = self.phase else { return }
                         switch p {

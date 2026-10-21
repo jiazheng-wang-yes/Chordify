@@ -49,7 +49,9 @@ Songs can also come from a link (YouTube and many other sites, beta).
   macOS build once (about 35 MB), checks it against the SHA-256 sums published
   with the release, and keeps it in `~/Library/Application Support/Chordify`.
   YouTube changes often; if a YouTube link fails, `brew install yt-dlp`
-  usually fixes it. Only analyse recordings you are allowed to download.
+  usually fixes it. If YouTube asks to "confirm you're not a bot", pick your
+  browser under "Use sign-in from" in the link sheet so yt-dlp can use your
+  sign-in. Only analyse recordings you are allowed to download.
 - **Detuned recordings** (for example old records) are measured and corrected
   before chord recognition.
 - **Chord chart export** as text: bars with chords and key/tempo headings,
