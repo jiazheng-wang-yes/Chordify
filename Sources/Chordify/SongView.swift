@@ -4,8 +4,18 @@ import SwiftUI
 
 enum Theme {
     static let background = Color(nsColor: .windowBackgroundColor)
-    static let accentGradient = LinearGradient(colors: [Color(red: 0.36, green: 0.42, blue: 0.98), Color(red: 0.78, green: 0.36, blue: 0.92)],
-                                               startPoint: .topLeading, endPoint: .bottomTrailing)
+    /// Monochrome accent, matching the app icon: graphite in light mode, light grey in dark mode.
+    static let ink = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(white: 0.90, alpha: 1) : NSColor(white: 0.13, alpha: 1)
+    })
+    static let accentGradient = LinearGradient(colors: [
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? NSColor(white: 0.96, alpha: 1) : NSColor(white: 0.30, alpha: 1)
+        }),
+        ink,
+    ], startPoint: .topLeading, endPoint: .bottomTrailing)
 
     /// Chord colour by root, arranged around the circle of fifths so that
     /// related chords get related colours.
@@ -324,8 +334,8 @@ struct Playhead: View {
     var body: some View {
         let x = model.currentTime / duration * width
         ZStack(alignment: .topLeading) {
-            Rectangle().fill(Color.accentColor.opacity(0.10)).frame(width: max(0, x))
-            Rectangle().fill(Color.accentColor).frame(width: 2).offset(x: x - 1)
+            Rectangle().fill(Theme.ink.opacity(0.08)).frame(width: max(0, x))
+            Rectangle().fill(Theme.ink).frame(width: 2).offset(x: x - 1)
         }
         .allowsHitTesting(false)
     }
