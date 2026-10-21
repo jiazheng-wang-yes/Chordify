@@ -2,13 +2,14 @@ import AppKit
 import ChordifyCore
 import SwiftUI
 
-/// `Chordify --analyze song.mp3 [--midi out.mid]` runs the analysis in the
-/// terminal; anything else starts the app.
+/// `Chordify --analyze song.mp3 [--midi out.mid] [--nashville]` or
+/// `Chordify --analyze-url <link>` runs the analysis in the terminal;
+/// anything else starts the app.
 @main
 enum Entry {
     static func main() {
         let args = CommandLine.arguments
-        if let i = args.firstIndex(of: "--analyze"), i + 1 < args.count {
+        if let i = args.firstIndex(where: { $0 == "--analyze" || $0 == "--analyze-url" }), i + 1 < args.count {
             exit(CommandLineTool.run(args))
         }
         ChordifyApp.main()
@@ -30,6 +31,8 @@ struct ChordifyApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("Open\u{2026}") { model.showOpenPanel() }
                     .keyboardShortcut("o")
+                Button("Open Link\u{2026} (Beta)") { model.showLinkSheet = true }
+                    .keyboardShortcut("l")
             }
             CommandGroup(after: .saveItem) {
                 Button("Export MIDI\u{2026}") { model.exportMIDI() }
@@ -63,10 +66,15 @@ struct ChordifyApp: App {
                 Picker("Chord Symbols", selection: Bindable(model).style) {
                     Text("Jazz (full extensions)").tag(ChordStyle.jazz)
                     Text("Simple (triads & sevenths)").tag(ChordStyle.simple)
+                    Text("Nashville Numbers").tag(ChordStyle.nashville)
                 }
                 .pickerStyle(.inline)
-                Button("Toggle Jazz / Simple") { model.style = model.style == .jazz ? .simple : .jazz }
-                    .keyboardShortcut("j")
+                Button("Next Chord Style") {
+                    let all = ChordStyle.allCases
+                    model.style = all[(all.firstIndex(of: model.style)! + 1) % all.count]
+                }
+                .keyboardShortcut("j")
+                Toggle("Nashville: Count Minor Keys from the Relative Major", isOn: Bindable(model).minorFromRelativeMajor)
                 Picker("Extensions (9, 11, 13)", selection: Bindable(model).extensions) {
                     ForEach(AppModel.Extensions.allCases) { Text($0.title).tag($0) }
                 }

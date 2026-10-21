@@ -240,3 +240,252 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------- song structure
+# Mirrors Sources/ChordifyCore/SongStructure.swift.
+
+def segment_series(x, sigma, beta):
+    """Optimal partitioning of a 1-D series into constant pieces:
+    minimise sum of squared deviations / sigma^2 + beta per piece.
+    Returns [(start, end)] index ranges."""
+    x = np.asarray(x, float)
+    n = len(x)
+    cs = np.concatenate([[0.0], np.cumsum(x)])
+    cs2 = np.concatenate([[0.0], np.cumsum(x * x)])
+    best = np.full(n + 1, np.inf)
+    best[0] = -beta
+    prev = np.zeros(n + 1, dtype=int)
+    for j in range(1, n + 1):
+        for i in range(j):
+            m = j - i
+            s = cs[j] - cs[i]
+            cost = (cs2[j] - cs2[i] - s * s / m) / sigma ** 2
+            v = best[i] + cost + beta
+            if v < best[j]:
+                best[j] = v
+                prev[j] = i
+    out = []
+    j = n
+    while j > 0:
+        out.append((int(prev[j]), j))
+        j = prev[j]
+    return out[::-1]
+
+
+def unify_beat_levels(beats, downbeats, tol=0.07):
+    """The beat tracker sometimes switches between metrical levels (for
+    example eighth notes and dotted quarters).  Regions whose beat period is
+    2x or 3x (or 1/2, 1/3) of a reference region are brought to the
+    reference level; other differences are real tempo changes."""
+    b = np.asarray(beats, float)
+    if len(b) < 8:
+        return b
+    ibi = np.diff(b)
+    regs = segment_series(np.log(ibi), 0.04, 15.0)
+    per = [float(np.median(ibi[a:c])) for a, c in regs]
+    dur = [float(ibi[a:c].sum()) for a, c in regs]
+    mode = [None] * len(regs)
+    fixed = [False] * len(regs)
+
+    def match(q):
+        for k in (2, 3):
+            if abs(q / k - 1) < tol:
+                return ("split", k)
+            if abs(q * k - 1) < tol:
+                return ("merge", k)
+        return None
+
+    order = sorted(range(len(regs)), key=lambda i: (-dur[i], i))
+    fixed[order[0]] = True
+    changed = True
+    while changed:
+        changed = False
+        for j in order:
+            if fixed[j]:
+                continue
+            refs = sorted((i for i in range(len(regs)) if fixed[i]), key=lambda i: (abs(i - j), -dur[i], i))
+            for i in refs:
+                if abs(per[j] / per[i] - 1) < tol:
+                    fixed[j] = True
+                    changed = True
+                    break
+                m = match(per[j] / per[i])
+                if m:
+                    mode[j] = m
+                    per[j] = per[i]
+                    fixed[j] = True
+                    changed = True
+                    break
+        if not changed:
+            rest = [j for j in order if not fixed[j]]
+            if rest:
+                fixed[rest[0]] = True
+                changed = True
+    dl = np.asarray(downbeats, float)
+    out = []
+    for (a, c), md in zip(regs, mode):
+        if md is None:
+            out += list(b[a:c])
+        elif md[0] == "split":
+            k = md[1]
+            for j in range(a, c):
+                out += [b[j] + (b[j + 1] - b[j]) * m / k for m in range(k)]
+        else:
+            k = md[1]
+            dset = [i for i in range(a, c) if len(dl) and np.min(np.abs(dl - b[i])) < 0.05]
+            phase = 0
+            if dset:
+                counts = [sum(1 for i in dset if (i - a) % k == ph) for ph in range(k)]
+                phase = int(np.argmax(counts))
+            out += [b[i] for i in range(a + phase, c, k)]
+    out.append(b[-1])
+    return np.array(sorted(set(np.round(out, 6))))
+
+
+def split_merged_bars(beats, downbeats):
+    """Downbeats on the (unified) beats; a bar of k*M beats, M being the
+    dominant meter, is split into k bars (missed downbeats)."""
+    if len(beats) == 0 or len(downbeats) == 0:
+        return np.array(downbeats, float)
+    idx = sorted({int(np.argmin(np.abs(beats - d))) for d in downbeats})
+    lens = [b - a for a, b in zip(idx, idx[1:] + [len(beats)])]
+    m = int(np.argmax(np.bincount(lens, weights=np.array(lens, float))))
+    out = []
+    for a, ln in zip(idx, lens):
+        if m >= 2 and ln >= 2 * m and ln % m == 0:
+            out += list(range(a, a + ln, m))
+        else:
+            out.append(a)
+    return beats[out]
+
+
+def regularize_rhythm(beats, downbeats):
+    b = unify_beat_levels(beats, downbeats)
+    return b, split_merged_bars(b, downbeats)
+
+
+def bar_starts(beats, downbeats):
+    """Bar start times: the downbeats, plus the first beat when there is a pickup."""
+    beats = list(beats)
+    downs = list(downbeats)
+    if not downs:
+        return beats[::4]
+    if beats and beats[0] < downs[0] - 0.01:
+        return [beats[0]] + downs
+    return downs
+
+
+def song_end(beats, duration):
+    if len(beats) < 2:
+        return duration
+    return min(duration, beats[-1] + float(np.median(np.diff(beats[-9:]))))
+
+
+def rhythm_sections(beats, downbeats, duration, sigma=0.025, beta=20.0, merge=0.04, min_bars=2):
+    """Sections of constant tempo and meter: [(start, end, first_bar, bpm, beats_per_bar)]."""
+    starts = bar_starts(beats, downbeats)
+    n = len(starts)
+    if n == 0:
+        return []
+    end = song_end(beats, duration)
+    ends = starts[1:] + [end]
+    b = np.asarray(beats, float)
+    counts = [max(1, int(((b >= s - 1e-6) & (b < e - 1e-6)).sum())) for s, e in zip(starts, ends)]
+    bpm = [60.0 * k / max(e - s, 1e-3) for s, e, k in zip(starts, ends, counts)]
+    met = list(counts)
+    # a change of meter must last at least `min_bars` bars
+    runs = []
+    s = 0
+    for i in range(1, n + 1):
+        if i == n or met[i] != met[s]:
+            runs.append([s, i, met[s]])
+            s = i
+    longs = [r for r in runs if r[1] - r[0] >= min_bars]
+    for r in runs:
+        if r[1] - r[0] < min_bars and longs:
+            before = [x for x in longs if x[1] <= r[0]]
+            r[2] = before[-1][2] if before else longs[0][2]
+    for a, c, m in runs:
+        for i in range(a, c):
+            met[i] = m
+    pieces = segment_series(np.log(bpm), sigma, beta)
+    bounds = sorted({0, n} | {a for a, _ in pieces} | {i for i in range(1, n) if met[i] != met[i - 1]})
+    out = []
+    for a, c in zip(bounds[:-1], bounds[1:]):
+        tempo = float(np.exp(np.median(np.log(bpm[a:c]))))
+        m = met[a]
+        if out and (c - a < min_bars or (out[-1][4] == m and abs(np.log(tempo / out[-1][3])) < merge)):
+            pa = out[-1][2]
+            tempo = float(np.exp(np.median(np.log(bpm[pa:c]))))
+            out[-1] = [starts[pa], ends[c - 1], pa, tempo, out[-1][4]]
+        else:
+            out.append([starts[a], ends[c - 1], a, tempo, m])
+    return [tuple(x) for x in out]
+
+
+KK_MAJOR = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
+KK_MINOR = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
+
+
+def _corr(a, b):
+    a = a - a.mean()
+    b = b - b.mean()
+    return float((a * b).sum() / max(np.sqrt((a * a).sum() * (b * b).sum()), 1e-12))
+
+
+def key_regions(segments_pc, beats, downbeats, duration, switch=3.0, relative=1.5, smooth=2):
+    """Local keys by Viterbi over bars.  `segments_pc` is a list of
+    (start, end, tones, bass, root) with absolute pitch classes (root -1 = no chord).
+    Keys are numbered tonic + 12 * minor.  Returns [(start, end, key)]."""
+    starts = bar_starts(beats, downbeats)
+    if not starts:
+        starts = [0.0]
+    end = song_end(beats, duration)
+    ends = starts[1:] + [max(end, starts[-1] + 1e-3)]
+    n = len(starts)
+    hist = np.zeros((n, 12))
+    for i, (a, c) in enumerate(zip(starts, ends)):
+        for s, e, tones, bass, root in segments_pc:
+            o = min(e, c) - max(s, a)
+            if o <= 0 or root < 0:
+                continue
+            for t in tones:
+                hist[i, t] += o
+            hist[i, bass] += 0.5 * o
+            hist[i, root] += 0.5 * o
+    profiles = [np.roll(KK_MAJOR, k) for k in range(12)] + [np.roll(KK_MINOR, k) for k in range(12)]
+    emis = np.zeros((n, 24))
+    for i in range(n):
+        lo, hi = max(0, i - smooth), min(n, i + smooth + 1)
+        h = np.zeros(12)
+        for j in range(lo, hi):
+            h += hist[j] * (smooth + 1 - abs(j - i))
+        if h.sum() > 0:
+            emis[i] = [_corr(h, p) for p in profiles]
+
+    def cost(a, b):
+        if a == b:
+            return 0.0
+        ta, ma, tb, mb = a % 12, a >= 12, b % 12, b >= 12
+        rel = (not ma and mb and tb == (ta + 9) % 12) or (ma and not mb and tb == (ta + 3) % 12)
+        return switch + (relative if rel else 0.0)
+
+    trans = np.array([[cost(a, b) for b in range(24)] for a in range(24)])
+    score = emis[0].copy()
+    back = np.zeros((n, 24), dtype=int)
+    for i in range(1, n):
+        cand = score[:, None] - trans
+        back[i] = cand.argmax(axis=0)
+        score = cand.max(axis=0) + emis[i]
+    path = [int(score.argmax())]
+    for i in range(n - 1, 0, -1):
+        path.append(int(back[i, path[-1]]))
+    path = path[::-1]
+    out = []
+    s = 0
+    for i in range(1, n + 1):
+        if i == n or path[i] != path[s]:
+            out.append((0.0 if s == 0 else starts[s], duration if i == n else starts[i], path[s]))
+            s = i
+    return out

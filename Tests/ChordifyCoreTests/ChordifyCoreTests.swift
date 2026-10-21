@@ -38,6 +38,34 @@ struct Fixtures: Decodable {
     let gap_cases: [GapCase]
     let downbeat_cases: [DownbeatCase]
     let mel_checks: [[Double]]
+    let rhythm_cases: [RhythmCase]
+    let key_cases: [KeyCase]
+
+    struct RhythmCase: Decodable {
+        let beats: [Double]
+        let downbeats: [Double]
+        let duration: Double
+        let out_beats: [Double]
+        let out_downbeats: [Double]
+        let sections: [[Double]]
+    }
+    struct KeyCase: Decodable {
+        let segments: [[Segment2]]
+        let beats: [Double]
+        let downbeats: [Double]
+        let duration: Double
+        let regions: [[Double]]
+    }
+    /// [start, end, [tones], bass, root]
+    enum Segment2: Decodable {
+        case number(Double), list([Int])
+        init(from decoder: Decoder) throws {
+            let c = try decoder.singleValueContainer()
+            if let d = try? c.decode(Double.self) { self = .number(d) } else { self = .list(try c.decode([Int].self)) }
+        }
+        var number: Double { if case .number(let d) = self { return d }; return .nan }
+        var list: [Int] { if case .list(let l) = self { return l }; return [] }
+    }
 }
 
 enum Paths {
@@ -212,5 +240,125 @@ final class ChordifyCoreTests: XCTestCase {
         XCTAssertEqual(cells.map(\.showsChord), [true, true, false, false])
         XCTAssertEqual(g.position(at: 3.1)?.bar, 2)
         XCTAssertEqual(g.position(at: 3.1)?.cell, 1)
+    }
+
+    // MARK: - song structure
+
+    func testRhythmRegularizationAndSectionsMatchReference() {
+        for (n, c) in fx.rhythm_cases.enumerated() {
+            let r = SongStructure.regularize(beats: c.beats, downbeats: c.downbeats)
+            XCTAssertEqual(r.beats.count, c.out_beats.count, "case \(n) beats")
+            for (a, b) in zip(r.beats, c.out_beats) { XCTAssertEqual(a, b, accuracy: 1e-6, "case \(n)") }
+            XCTAssertEqual(r.downbeats.count, c.out_downbeats.count, "case \(n) downbeats")
+            for (a, b) in zip(r.downbeats, c.out_downbeats) { XCTAssertEqual(a, b, accuracy: 1e-6, "case \(n)") }
+            let sections = SongStructure.rhythmSections(beats: c.out_beats, downbeats: c.out_downbeats, duration: c.duration)
+            XCTAssertEqual(sections.count, c.sections.count, "case \(n) sections")
+            for (s, ref) in zip(sections, c.sections) {
+                XCTAssertEqual(s.start, ref[0], accuracy: 1e-6)
+                XCTAssertEqual(s.end, ref[1], accuracy: 1e-6)
+                XCTAssertEqual(s.firstBar, Int(ref[2]))
+                XCTAssertEqual(s.bpm, ref[3], accuracy: 1e-6 * ref[3])
+                XCTAssertEqual(s.beatsPerBar, Int(ref[4]))
+            }
+        }
+        // the synthetic case: 4/4 at 120 (with a beat-level switch), 3/4 at 90, 4/4 at 90
+        let s0 = SongStructure.rhythmSections(beats: fx.rhythm_cases[0].out_beats, downbeats: fx.rhythm_cases[0].out_downbeats,
+                                              duration: fx.rhythm_cases[0].duration)
+        XCTAssertEqual(s0.map(\.beatsPerBar), [4, 3, 4])
+        XCTAssertEqual(s0.map { Int($0.bpm.rounded()) }, [120, 90, 90])
+    }
+
+    func testKeyRegionsMatchReference() {
+        for (n, c) in fx.key_cases.enumerated() {
+            let spans = c.segments.map {
+                SongStructure.ChordSpan(start: $0[0].number, end: $0[1].number, tones: $0[2].list,
+                                        bass: Int($0[3].number), root: Int($0[4].number))
+            }
+            let regions = SongStructure.keyRegions(chords: spans, beats: c.beats, downbeats: c.downbeats, duration: c.duration)
+            XCTAssertEqual(regions.count, c.regions.count, "case \(n)")
+            for (r, ref) in zip(regions, c.regions) {
+                XCTAssertEqual(r.start, ref[0], accuracy: 1e-9)
+                XCTAssertEqual(r.end, ref[1], accuracy: 1e-9)
+                XCTAssertEqual(r.key.tonic + (r.key.minor ? 12 : 0), Int(ref[2]))
+            }
+        }
+        // C -> Eb -> C -> D
+        XCTAssertEqual(fx.key_cases[0].regions.map { Int($0[2]) }, [0, 3, 0, 2])
+    }
+
+    func testNashvilleNumbers() {
+        func seg(_ root: Int, _ harte: String) -> ChordSegment {
+            ChordSegment(start: 0, end: 1, root: root, typeIndex: vocab.types.firstIndex { $0.harte == harte }!)
+        }
+        let c = MusicalKey(tonic: 0, minor: false)
+        func num(_ s: ChordSegment, _ k: MusicalKey, transpose: Int = 0, relative: Bool = false) -> String {
+            vocab.symbol(for: s, style: .nashville, transpose: transpose, key: k, minorFromRelativeMajor: relative).text
+        }
+        XCTAssertEqual(num(seg(0, "maj"), c), "1")
+        XCTAssertEqual(num(seg(7, "7"), c), "5(7)")
+        XCTAssertEqual(num(seg(9, "min7"), c), "6m7")
+        XCTAssertEqual(num(seg(5, "maj7"), c), "4maj7")
+        XCTAssertEqual(num(seg(10, "maj"), c), "\u{266D}7")
+        XCTAssertEqual(num(seg(0, "maj/3"), c), "1/3")
+        XCTAssertEqual(num(seg(2, "9"), c), "2(7)")  // simple suffix of a 9 chord is 7
+        // numbers do not change when transposing
+        XCTAssertEqual(num(seg(7, "7"), c, transpose: 3), "5(7)")
+        // minor key: from the minor tonic, or from the relative major
+        let am = MusicalKey(tonic: 9, minor: true)
+        XCTAssertEqual(num(seg(9, "min"), am), "1m")
+        XCTAssertEqual(num(seg(5, "maj"), am), "\u{266D}6")
+        XCTAssertEqual(num(seg(4, "7"), am), "5(7)")
+        XCTAssertEqual(num(seg(9, "min"), am, relative: true), "6m")
+        XCTAssertEqual(num(seg(5, "maj"), am, relative: true), "4")
+        // spelling follows the local key in the other styles
+        XCTAssertEqual(vocab.symbol(for: seg(10, "maj"), style: .simple, transpose: 0, key: MusicalKey(tonic: 3, minor: false)).text,
+                       "B\u{266D}")
+        XCTAssertEqual(vocab.symbol(for: seg(10, "maj"), style: .simple, transpose: 0, key: MusicalKey(tonic: 11, minor: false)).text,
+                       "A\u{266F}")
+        XCTAssertEqual(MusicalKey(tonic: 3, minor: false).signature, -3)
+        XCTAssertEqual(MusicalKey(tonic: 4, minor: true).signature, 1)
+    }
+
+    func testChartMarksKeyChanges() {
+        let c = fx.key_cases[0]
+        let segs = c.segments.map { s -> ChordSegment in
+            let root = Int(s[4].number)
+            let tones = Set(s[2].list.map { ($0 - root + 12) % 12 })
+            let type = vocab.types.firstIndex { Set($0.tones) == tones && $0.bass == 0 }!
+            return ChordSegment(start: s[0].number, end: s[1].number, root: root, typeIndex: type)
+        }
+        var a = SongAnalysis(duration: c.duration, segments: segs, beats: c.beats, downbeats: c.downbeats,
+                             key: nil, tuningCents: 0)
+        a.updateKeys(vocabulary: vocab)
+        a.sections = SongStructure.rhythmSections(beats: c.beats, downbeats: c.downbeats, duration: c.duration)
+        XCTAssertEqual(a.keyRegions.count, 4)
+        XCTAssertEqual(a.sections.count, 1)
+        let grid = BarGrid(analysis: a)
+        XCTAssertEqual(grid.bars.compactMap(\.keyChange).map(\.tonic), [3, 0, 2])
+        let text = ChordChart.text(analysis: a, vocabulary: vocab, style: .nashville, transpose: 0)
+        XCTAssertTrue(text.contains("[Key: Eb major at 0:32]"), text)
+        XCTAssertTrue(text.contains("| 1 | 6m | 2m7 | 5(7) |"), text)
+        let midi = MIDIExport.data(for: a, vocabulary: vocab)
+        // four key signature events (FF 59 02)
+        let sig = Data([0xFF, 0x59, 0x02])
+        var count = 0, i = midi.startIndex
+        while let r = midi[i...].firstRange(of: sig) { count += 1; i = r.upperBound }
+        XCTAssertEqual(count, 4)
+    }
+
+    func testLinkDownloaderHelpers() {
+        XCTAssertEqual(LinkDownloader.normalise("youtube.com/watch?v=abc")?.absoluteString, "https://youtube.com/watch?v=abc")
+        XCTAssertNil(LinkDownloader.normalise("file:///etc/passwd"))
+        XCTAssertNil(LinkDownloader.normalise("not a link"))
+        let args = LinkDownloader.arguments(url: URL(string: "https://example.com/-x")!, output: URL(fileURLWithPath: "/tmp/a.%(ext)s"), ffmpeg: nil)
+        XCTAssertEqual(Array(args.suffix(2)), ["--", "https://example.com/-x"])
+        XCTAssertFalse(args.contains("-x"))
+        var out = LinkDownloader.ToolOutput()
+        out.parse("CHORDIFY_PROGRESS  42.5%")
+        XCTAssertEqual(out.percent ?? 0, 0.425, accuracy: 1e-9)
+        out.parse("CHORDIFY_FILE /tmp/x y.m4a")
+        out.parse("CHORDIFY_TITLE Autumn Leaves")
+        XCTAssertEqual(out.file, "/tmp/x y.m4a")
+        XCTAssertEqual(out.title, "Autumn Leaves")
     }
 }

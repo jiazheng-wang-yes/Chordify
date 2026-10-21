@@ -98,25 +98,34 @@ struct InfoColumn: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        let a = model.analysis
+        let keyCount = Set(a?.keyRegions.map(\.key) ?? []).count
+        let sectionCount = a?.sections.count ?? 0
         VStack(alignment: .trailing, spacing: 6) {
-            if let k = model.analysis?.key {
-                Pill(icon: "key", text: k.name(transpose: model.transpose))
+            if let k = model.currentKey ?? a?.key {
+                Pill(icon: "key", text: model.keyName(k),
+                     note: keyCount > 1 ? "\(keyCount) keys" : nil)
+                    .help(keyCount > 1 ? "The key changes during the song; numbers and spelling follow the local key" : "Key")
             }
-            if let bpm = model.analysis?.tempo {
+            if let s = model.currentSection {
+                Pill(icon: "metronome", text: String(format: "%.0f BPM", s.bpm),
+                     note: sectionCount > 1 ? "\(sectionCount) sections" : nil)
+                Pill(icon: "music.quarternote.3", text: "\(s.beatsPerBar) beats / bar")
+            } else if let bpm = a?.tempo {
                 Pill(icon: "metronome", text: String(format: "%.0f BPM", bpm))
             }
-            if let g = model.grid {
-                Pill(icon: "music.quarternote.3", text: "\(g.beatsPerBar) beats / bar")
-            }
         }
+        .animation(.easeOut(duration: 0.2), value: model.currentKey)
+        .animation(.easeOut(duration: 0.2), value: model.currentSection)
     }
 }
 
 struct Pill: View {
     var icon: String
     var text: String
+    var note: String? = nil
     var body: some View {
-        Label(text, systemImage: icon)
+        Label(text + (note.map { "  \u{00B7} " + $0 } ?? ""), systemImage: icon)
             .font(.callout)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
@@ -210,7 +219,7 @@ struct ChordGridView: View {
                 let rows = stride(from: 0, to: grid.bars.count, by: perRow).map { Array(grid.bars[$0..<min($0 + perRow, grid.bars.count)]) }
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 8) {
+                        LazyVStack(spacing: 16) {
                             ForEach(rows.indices, id: \.self) { r in
                                 HStack(spacing: 8) {
                                     ForEach(rows[r]) { bar in
@@ -270,7 +279,32 @@ struct BarView: View {
         .overlay(alignment: .leading) {
             RoundedRectangle(cornerRadius: 1).fill(model.color(bar.cells.first?.segment)).frame(width: 3).padding(.vertical, 8)
         }
+        .overlay(alignment: .topLeading) {
+            // key, tempo and meter changes start at this bar
+            HStack(spacing: 4) {
+                if let k = bar.keyChange { ChangeTag(icon: "key", text: model.keyName(k)) }
+                if let s = bar.sectionChange {
+                    ChangeTag(icon: "metronome", text: String(format: "%.0f BPM \u{00B7} %ld/bar", s.bpm, s.beatsPerBar))
+                }
+            }
+            .offset(x: 6, y: -9)
+        }
         .frame(maxWidth: .infinity)
+    }
+}
+
+struct ChangeTag: View {
+    var icon: String
+    var text: String
+    var body: some View {
+        Label(text, systemImage: icon)
+            .font(.system(size: 10, weight: .semibold))
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Theme.ink, in: Capsule())
+            .foregroundStyle(Theme.background)
+            .fixedSize()
     }
 }
 
@@ -322,6 +356,15 @@ struct WaveformCanvas: View {
                 path.addRect(CGRect(x: CGFloat(j) * barW, y: mid - amp, width: max(barW, 1), height: amp * 2 + 0.5))
             }
             ctx.fill(path, with: .color(.secondary.opacity(0.45)))
+            // key and tempo/meter changes
+            var marks = Path()
+            for t in a.keyRegions.dropFirst().map(\.start) + a.sections.dropFirst().map(\.start) {
+                let x = t / duration * size.width
+                marks.move(to: CGPoint(x: x, y: 0))
+                marks.addLine(to: CGPoint(x: x, y: h - 12))
+                marks.addEllipse(in: CGRect(x: x - 2.5, y: 0, width: 5, height: 5))
+            }
+            ctx.stroke(marks, with: .color(.primary.opacity(0.6)), lineWidth: 1)
         }
     }
 }

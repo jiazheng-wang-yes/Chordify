@@ -35,7 +35,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Models Tests/ChordifyCoreTests/Fixtures
+          # The ONNX export is not byte-for-byte reproducible, so model binaries
+          # are only replaced on a manual run; pushes update fixtures and vocabulary.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            git add Models
+          else
+            git checkout -- Models/*.onnx
+            git add Models/chord_vocab.json
+          fi
+          git add Tests/ChordifyCoreTests/Fixtures
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git commit -m "Regenerate models and test fixtures"
           git push
