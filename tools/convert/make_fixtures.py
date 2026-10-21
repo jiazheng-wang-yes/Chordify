@@ -19,6 +19,69 @@ import onnxruntime as ort
 import reference_pipeline as rp
 
 
+def synth_beats(spec, seed):
+    """spec: [(bars, beats_per_bar, bpm, level)]; level 2 = tracker counts every other beat."""
+    rng = np.random.default_rng(seed)
+    beats, downs, t = [], [], 0.3
+    for nbars, bpb, bpm, level in spec:
+        for _ in range(nbars):
+            downs.append(t)
+            for _ in range(bpb // level):
+                beats.append(round(t, 6))
+                t += 60 / bpm * level * (1 + rng.normal(0, 0.008))
+    return beats, [round(d, 6) for d in downs], round(t, 6)
+
+
+def rhythm_cases(args):
+    cases = []
+    specs = [
+        [(16, 4, 120, 1), (8, 4, 120, 2), (12, 3, 90, 1), (10, 4, 90, 1)],
+        [(20, 4, 100, 1), (20, 4, 130, 1)],
+        [(30, 4, 96, 1)],
+    ]
+    inputs = [synth_beats(sp, i) for i, sp in enumerate(specs)]
+    # the whole sample song (its beat tracker output switches metrical level)
+    import librosa
+    y, _ = librosa.load(args.audio, sr=rp.SR)
+    y = y.astype(np.float32)
+    mel = ort.InferenceSession(f"{args.models}/beat_mel.onnx").run(None, {"audio": y})[0]
+    bsess = ort.InferenceSession(f"{args.models}/beat_this.onnx")
+    bl, dl = rp.beat_logits(mel, lambda x: bsess.run(None, {"spect": x}))
+    b, d = rp.postprocess_beats(bl, dl)
+    b = rp.fill_beat_gaps(b)
+    d = rp.clean_downbeats(b, d)
+    inputs.append((b.tolist(), d.tolist(), len(y) / rp.SR))
+    for beats, downs, duration in inputs:
+        rb, rd = rp.regularize_rhythm(np.array(beats), np.array(downs))
+        cases.append({
+            "beats": list(map(float, beats)), "downbeats": list(map(float, downs)), "duration": float(duration),
+            "out_beats": rb.tolist(), "out_downbeats": rd.tolist(),
+            "sections": [[float(s), float(e), int(i), float(t), int(m)]
+                         for s, e, i, t, m in rp.rhythm_sections(rb, rd, duration)],
+        })
+    return cases
+
+
+def key_cases():
+    shapes = {"M": [0, 4, 7], "m": [0, 3, 7], "7": [0, 4, 7, 10], "m7": [0, 3, 7, 10], "M7": [0, 4, 7, 11]}
+    prog = [(0, "M"), (9, "m"), (2, "m7"), (7, "7"), (0, "M7"), (5, "M"), (7, "7"), (0, "M")]
+    cases = []
+    for shifts in ([0, 0, 3, 3, 0, 0, 2, 2], [0, 0, 0, 0, 0, 0], [7, 7, 7, 9, 9, 9]):
+        segs, beats, downs, t = [], [], [], 0.0
+        for k in shifts:
+            for root, q in prog:
+                r = (root + k) % 12
+                tones = sorted({(r + x) % 12 for x in shapes[q]})
+                segs.append([t, t + 2.0, tones, r, r])
+                downs.append(t)
+                beats += [t + 0.5 * j for j in range(4)]
+                t += 2.0
+        regions = rp.key_regions([tuple(x) for x in segs], beats, downs, t)
+        cases.append({"segments": segs, "beats": beats, "downbeats": downs, "duration": t,
+                      "regions": [[float(s), float(e), int(k)] for s, e, k in regions]})
+    return cases
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", required=True)
@@ -91,6 +154,8 @@ def main():
         ],
         "mel_checks": [[int(t), int(f), float(mel[t, f])] for t, f in [(0, 0), (100, 64), (1000, 127)]],
     }
+    data["rhythm_cases"] = rhythm_cases(args)
+    data["key_cases"] = key_cases()
     with open(os.path.join(args.out, "fixtures.json"), "w") as f:
         json.dump(data, f)
     print("fixtures written to", args.out)

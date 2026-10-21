@@ -12,6 +12,8 @@ struct ContentView: View {
             switch model.phase {
             case .empty:
                 EmptyStateView(targeted: dropTargeted)
+            case .downloading(let status, let fraction):
+                DownloadingView(status: status, fraction: fraction)
             case .analyzing(let stage):
                 AnalyzingView(title: model.title, stage: stage)
             case .failed(let message):
@@ -21,12 +23,17 @@ struct ContentView: View {
             }
         }
         .tint(Theme.ink)
+        .sheet(isPresented: Bindable(model).showLinkSheet) { LinkSheet() }
         .toolbar { toolbarItems }
         .navigationTitle(model.title.isEmpty ? "Chordify" : model.title)
-        .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
+        .onDrop(of: [.fileURL, .url], isTargeted: $dropTargeted) { providers in
             guard let p = providers.first else { return false }
             _ = p.loadObject(ofClass: URL.self) { url, _ in
-                if let url { Task { @MainActor in model.open(url) } }
+                guard let url else { return }
+                Task { @MainActor in
+                    // a dragged web link (from a browser) is analysed as a link
+                    if url.isFileURL { model.open(url) } else { model.openLink(url.absoluteString) }
+                }
             }
             return true
         }
@@ -58,10 +65,14 @@ struct EmptyStateView: View {
                     Text("MP3, M4A, WAV, AIFF, FLAC, ALAC")
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                    Button("Choose a File\u{2026}") { model.showOpenPanel() }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .padding(.top, 6)
+                    HStack(spacing: 10) {
+                        Button("Choose a File\u{2026}") { model.showOpenPanel() }
+                            .buttonStyle(.borderedProminent)
+                        Button("Open a Link\u{2026}") { model.showLinkSheet = true }
+                            .buttonStyle(.bordered)
+                    }
+                    .controlSize(.large)
+                    .padding(.top, 6)
                 }
             }
             .frame(width: 440, height: 300)
@@ -70,6 +81,81 @@ struct EmptyStateView: View {
                 .foregroundStyle(.tertiary)
         }
         .animation(.easeOut(duration: 0.15), value: targeted)
+    }
+}
+
+struct DownloadingView: View {
+    @Environment(AppModel.self) private var model
+    var status: String
+    var fraction: Double?
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Text(model.title)
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+            if let fraction {
+                ProgressView(value: fraction).frame(width: 300)
+            } else {
+                ProgressView().controlSize(.regular)
+            }
+            Text(status + (fraction.map { String(format: " %.0f%%", $0 * 100) } ?? ""))
+                .foregroundStyle(.secondary)
+            Button("Cancel") { model.cancelDownload() }
+        }
+        .padding(40)
+    }
+}
+
+/// Paste a link to a song or video (beta).
+struct LinkSheet: View {
+    @Environment(AppModel.self) private var model
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        @Bindable var model = model
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Text("Analyze a Link").font(.title2.weight(.semibold))
+                Text("BETA")
+                    .font(.caption2.weight(.bold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .overlay(Capsule().strokeBorder(.secondary))
+                    .foregroundStyle(.secondary)
+            }
+            TextField("https://www.youtube.com/watch?v=\u{2026}", text: $model.linkText)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 440)
+                .focused($focused)
+                .onSubmit { model.openLink(model.linkText) }
+            Text("""
+                YouTube, SoundCloud, Bandcamp, Vimeo and most pages with audio or video work, \
+                as do direct links to audio files. Downloads use the open-source yt-dlp tool \
+                (installed once, about 35 MB, if it is not already on your Mac). \
+                Only analyse recordings you are allowed to download.
+                """)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: 440, alignment: .leading)
+            HStack {
+                Spacer()
+                Button("Cancel") { model.showLinkSheet = false }
+                    .keyboardShortcut(.cancelAction)
+                Button("Analyze") { model.openLink(model.linkText) }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(LinkDownloader.normalise(model.linkText) == nil)
+            }
+        }
+        .padding(22)
+        .onAppear {
+            if model.linkText.isEmpty, let s = NSPasteboard.general.string(forType: .string),
+               LinkDownloader.normalise(s) != nil, s.contains(".") {
+                model.linkText = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            focused = true
+        }
     }
 }
 
@@ -121,7 +207,10 @@ struct FailedView: View {
             Text(message)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 420)
-            Button("Open Another Song\u{2026}") { model.showOpenPanel() }
+            HStack {
+                Button("Open Another Song\u{2026}") { model.showOpenPanel() }
+                Button("Open a Link\u{2026}") { model.showLinkSheet = true }
+            }
         }
     }
 }
@@ -136,9 +225,10 @@ extension ContentView {
                 Picker("Chord symbols", selection: Bindable(model).style) {
                     Text("Jazz").tag(ChordStyle.jazz)
                     Text("Simple").tag(ChordStyle.simple)
+                    Text("1\u{2009}4\u{2009}5").tag(ChordStyle.nashville)
                 }
                 .pickerStyle(.segmented)
-                .help("Jazz shows every extension and slash bass (\u{2318}J)")
+                .help("Jazz: every extension and slash bass. Simple: triads and sevenths. 1 4 5: Nashville numbers in the local key (\u{2318}J cycles)")
 
                 Menu {
                     Picker("Extensions", selection: Bindable(model).extensions) {
@@ -160,6 +250,12 @@ extension ContentView {
                 }
                 .help("Export MIDI (\u{2318}E)")
             }
+            Button {
+                model.showLinkSheet = true
+            } label: {
+                Label("Open Link", systemImage: "link")
+            }
+            .help("Analyze a song or video from a link, beta (\u{2318}L)")
             Button {
                 model.showOpenPanel()
             } label: {

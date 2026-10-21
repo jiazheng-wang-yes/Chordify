@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 final class AppModel {
     enum Phase {
         case empty
+        case downloading(String, Double?)
         case analyzing(Analyzer.Stage)
         case ready
         case failed(String)
@@ -26,6 +27,9 @@ final class AppModel {
     /// (bar, cell) under the playhead; only changes once per beat.
     var position: (bar: Int, cell: Int)?
     var currentSegment: Int?
+    /// Local key and tempo/meter section under the playhead.
+    var currentKey: MusicalKey?
+    var currentSection: RhythmSection?
     var speed: Double = 1 { didSet { player.rate = Float(speed) } }
 
     // display
@@ -44,6 +48,14 @@ final class AppModel {
     var style: ChordStyle = .jazz
     var transpose = 0 { didSet { applyPitch() } }
     var shiftAudio = true { didSet { applyPitch() } }
+    /// Nashville numbers: count minor keys from the relative major (minor tonic = 6m).
+    var minorFromRelativeMajor = false
+
+    // links (beta)
+    var showLinkSheet = false
+    var linkText = ""
+    private let downloader = LinkDownloader()
+    private var downloadTask: Task<Void, Never>?
 
     private(set) var vocabulary: ChordVocabulary?
     private var analyzer: Analyzer?
@@ -62,14 +74,16 @@ final class AppModel {
 
     var duration: Double { analysis?.duration ?? player.duration }
 
-    var preferFlats: Bool? {
-        guard let k = analysis?.key else { return nil }
-        return MusicalKey(tonic: (k.tonic + transpose + 120) % 12, minor: k.minor).prefersFlats
-    }
-
     func symbol(_ segment: Int?) -> ChordSymbol {
         guard let i = segment, let a = analysis, let v = vocabulary, i < a.segments.count else { return .noChord }
-        return v.symbol(for: a.segments[i], style: style, transpose: transpose, preferFlats: preferFlats)
+        let s = a.segments[i]
+        return v.symbol(for: s, style: style, transpose: transpose, key: a.key(at: s.start),
+                        minorFromRelativeMajor: minorFromRelativeMajor)
+    }
+
+    /// "E♭ major" for a key, after transposition.
+    func keyName(_ k: MusicalKey?) -> String {
+        k.map { $0.name(transpose: transpose) } ?? "-"
     }
 
     func pitchClasses(_ segment: Int?) -> (tones: [Int], bass: Int)? {
@@ -86,7 +100,8 @@ final class AppModel {
 
     // MARK: - opening
 
-    func open(_ url: URL) {
+    func open(_ url: URL, title displayTitle: String? = nil) {
+        downloadTask?.cancel()
         analysisTask?.cancel()
         player.stop()
         stopTimer()
@@ -96,7 +111,9 @@ final class AppModel {
         currentSegment = nil
         transpose = 0
         fileURL = url
-        title = url.deletingPathExtension().lastPathComponent
+        title = displayTitle ?? url.deletingPathExtension().lastPathComponent
+        currentKey = nil
+        currentSection = nil
         analysis = nil
         grid = nil
         do {
@@ -105,7 +122,7 @@ final class AppModel {
             phase = .failed("Could not open \(url.lastPathComponent).\n\(error.localizedDescription)")
             return
         }
-        NSDocumentController.shared.noteNewRecentDocumentURL(url)
+        if displayTitle == nil { NSDocumentController.shared.noteNewRecentDocumentURL(url) }
         phase = .analyzing(.decoding)
         analysisTask = Task { [weak self] in
             await self?.runAnalysis(url)
@@ -163,6 +180,55 @@ final class AppModel {
         grid = BarGrid(analysis: updated)
         if let cacheKey { AnalysisCache.store(updated, key: cacheKey) }
         updatePosition()
+    }
+
+    // MARK: - links (beta)
+
+    /// Downloads the audio behind a web link, then analyses it like a file.
+    func openLink(_ text: String) {
+        guard let url = LinkDownloader.normalise(text) else {
+            phase = .failed("That does not look like a web link:\n\(text)")
+            return
+        }
+        showLinkSheet = false
+        analysisTask?.cancel()
+        downloadTask?.cancel()
+        player.stop()
+        stopTimer()
+        isPlaying = false
+        analysis = nil
+        grid = nil
+        title = url.host ?? url.absoluteString
+        phase = .downloading("Looking up the link", nil)
+        let fetcher = self.downloader
+        downloadTask = Task { [weak self] in
+            do {
+                let result = try await fetcher.fetch(url, installIfNeeded: true) { p in
+                    Task { @MainActor [weak self] in
+                        guard let self, case .downloading = self.phase else { return }
+                        switch p {
+                        case .installingTool: self.phase = .downloading("Installing the yt-dlp download tool (once)", nil)
+                        case .resolving: self.phase = .downloading("Looking up the link", nil)
+                        case .downloading(let f): self.phase = .downloading("Downloading audio", f)
+                        case .converting: self.phase = .downloading("Converting audio", nil)
+                        }
+                    }
+                }
+                guard !Task.isCancelled else { return }
+                self?.open(result.file, title: result.title)
+            } catch is CancellationError {
+                self?.phase = .empty
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.phase = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func cancelDownload() {
+        downloader.cancel()
+        downloadTask?.cancel()
+        phase = .empty
     }
 
     func showOpenPanel() {
@@ -239,6 +305,10 @@ final class AppModel {
         if p?.bar != position?.bar || p?.cell != position?.cell { position = p }
         let s = analysis?.segmentIndex(at: currentTime + 0.02)
         if s != currentSegment { currentSegment = s }
+        let k = analysis?.key(at: currentTime + 0.02)
+        if k != currentKey { currentKey = k }
+        let sec = analysis?.section(at: currentTime + 0.02)
+        if sec != currentSection { currentSection = sec }
     }
 
     // MARK: - export
@@ -253,6 +323,7 @@ final class AppModel {
         var options = MIDIExport.Options()
         options.transpose = transpose
         options.style = style
+        options.minorFromRelativeMajor = minorFromRelativeMajor
         do {
             try MIDIExport.data(for: a, vocabulary: v, options: options).write(to: url)
         } catch {
@@ -261,30 +332,13 @@ final class AppModel {
     }
 
     func exportChart() {
-        guard let a = analysis, let g = grid else { return }
+        guard let a = analysis, let v = vocabulary else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.plainText]
-        panel.nameFieldStringValue = title + " chords.txt"
+        panel.nameFieldStringValue = title + (style == .nashville ? " numbers.txt" : " chords.txt")
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        var lines = [title]
-        if let k = a.key { lines.append("Key: \(PitchSpelling.ascii(k.name(transpose: transpose)))") }
-        if let bpm = a.tempo { lines.append(String(format: "Tempo: %.0f BPM", bpm)) }
-        lines.append("")
-        var row = [String]()
-        for bar in g.bars {
-            let cells = bar.cells.filter(\.showsChord).map { PitchSpelling.ascii(symbol($0.segment).text) }
-            row.append(cells.joined(separator: " "))
-            if row.count == 4 {
-                lines.append("| " + row.joined(separator: " | ") + " |")
-                row = []
-            }
-        }
-        if !row.isEmpty { lines.append("| " + row.joined(separator: " | ") + " |") }
-        lines.append("")
-        lines.append("Timed chords (seconds):")
-        for (i, s) in a.segments.enumerated() {
-            lines.append(String(format: "%8.2f  %8.2f  ", s.start, s.end) + PitchSpelling.ascii(symbol(i).text))
-        }
-        try? lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+        let text = ChordChart.text(analysis: a, vocabulary: v, style: style, transpose: transpose,
+                                   minorFromRelativeMajor: minorFromRelativeMajor, title: title)
+        try? text.write(to: url, atomically: true, encoding: .utf8)
     }
 }

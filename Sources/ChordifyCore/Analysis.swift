@@ -3,7 +3,7 @@ import Foundation
 
 /// Everything the app needs to show and export a song.
 public struct SongAnalysis: Codable, Sendable {
-    public static let formatVersion = 1
+    public static let formatVersion = 2
 
     public var version = SongAnalysis.formatVersion
     public var duration: Double
@@ -17,6 +17,28 @@ public struct SongAnalysis: Codable, Sendable {
     public var envelope: [Float] = []
     /// Extension boost used to decode `segments`.
     public var extensionBoost: Float = Analyzer.defaultExtensionBoost
+    /// Local keys (modulations); `key` is the key of the longest region.
+    public var keyRegions: [KeyRegion] = []
+    /// Stretches of constant tempo and meter.
+    public var sections: [RhythmSection] = []
+
+    /// Local key at time t (falls back to the global key).
+    public func key(at t: Double) -> MusicalKey? {
+        keyRegions.last(where: { $0.start <= t + 1e-6 })?.key ?? keyRegions.first?.key ?? key
+    }
+
+    public func section(at t: Double) -> RhythmSection? {
+        sections.last(where: { $0.start <= t + 1e-6 }) ?? sections.first
+    }
+
+    /// Recompute keys from the current segments.
+    mutating func updateKeys(vocabulary v: ChordVocabulary) {
+        keyRegions = SongStructure.keyRegions(segments: segments, vocabulary: v, beats: beats,
+                                              downbeats: downbeats, duration: duration)
+        var length = [MusicalKey: Double]()
+        for r in keyRegions { length[r.key, default: 0] += r.end - r.start }
+        key = length.max { $0.value < $1.value }?.key ?? MusicalKey.estimate(segments: segments, vocabulary: v)
+    }
 
     public var tempo: Double? {
         guard beats.count > 2 else { return nil }
@@ -48,6 +70,10 @@ public struct BarGrid: Sendable {
     public struct Bar: Hashable, Sendable, Identifiable {
         public var id: Int
         public var cells: [Cell]
+        /// The key changes at this bar (not set for the first key).
+        public var keyChange: MusicalKey?
+        /// A new tempo / meter section starts at this bar (not set for the first one).
+        public var sectionChange: RhythmSection?
         public var start: Double { cells.first?.time ?? 0 }
         public var end: Double { cells.last?.end ?? 0 }
     }
@@ -92,6 +118,16 @@ public struct BarGrid: Sendable {
                 previous = .some(seg)
             }
             bars.append(Bar(id: bi, cells: cells))
+        }
+        // mark key and tempo/meter changes on the bar where they start
+        func barIndex(at t: Double) -> Int? {
+            bars.firstIndex { abs($0.start - t) < 0.05 } ?? bars.lastIndex { $0.start <= t }
+        }
+        for r in a.keyRegions.dropFirst() {
+            if let i = barIndex(at: r.start) { bars[i].keyChange = r.key }
+        }
+        for s in a.sections.dropFirst() {
+            if let i = barIndex(at: s.start) { bars[i].sectionChange = s }
         }
         self.bars = bars
     }
@@ -179,9 +215,10 @@ public final class Analyzer: @unchecked Sendable {
 
         progress(.finishing)
         let segments = decode(probs, beats: beats, extensionBoost: extensionBoost)
-        let key = MusicalKey.estimate(segments: segments, vocabulary: vocabulary)
-        let a = SongAnalysis(duration: duration, segments: segments, beats: beats, downbeats: downbeats,
-                             key: key, tuningCents: cents, envelope: Self.envelope(audio), extensionBoost: extensionBoost)
+        var a = SongAnalysis(duration: duration, segments: segments, beats: beats, downbeats: downbeats,
+                             key: nil, tuningCents: cents, envelope: Self.envelope(audio), extensionBoost: extensionBoost)
+        a.updateKeys(vocabulary: vocabulary)
+        a.sections = SongStructure.rhythmSections(beats: beats, downbeats: downbeats, duration: duration)
         return (a, probs)
     }
 
@@ -189,7 +226,7 @@ public final class Analyzer: @unchecked Sendable {
     public func redecode(_ a: SongAnalysis, probabilities: ChordProbabilities, extensionBoost: Float) -> SongAnalysis {
         var b = a
         b.segments = decode(probabilities, beats: a.beats, extensionBoost: extensionBoost)
-        b.key = MusicalKey.estimate(segments: b.segments, vocabulary: vocabulary)
+        b.updateKeys(vocabulary: vocabulary)
         b.extensionBoost = extensionBoost
         return b
     }
@@ -238,7 +275,8 @@ public final class Analyzer: @unchecked Sendable {
         }
         let raw = BeatTracking.postprocess(beat: b, downbeat: d)
         let beats = BeatTracking.fillGaps(raw.beats)
-        return (beats, BeatTracking.cleanDownbeats(beats: beats, downbeats: raw.downbeats))
+        let downbeats = BeatTracking.cleanDownbeats(beats: beats, downbeats: raw.downbeats)
+        return SongStructure.regularize(beats: beats, downbeats: downbeats)
     }
 }
 

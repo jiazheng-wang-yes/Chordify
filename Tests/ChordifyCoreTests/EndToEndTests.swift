@@ -70,6 +70,12 @@ final class EndToEndTests: XCTestCase {
         let v = analyzer.vocabulary
         let text = a.segments.prefix(30).map { v.symbol(for: $0, style: .jazz, transpose: 0, preferFlats: a.key?.prefersFlats).text }
         print(text.joined(separator: " "))
+        // one key and one tempo/meter section, although the beat tracker switches metrical level mid-song
+        print("keys: \(a.keyRegions.map { $0.key.name() }), sections: \(a.sections.map { "\($0.bpm) x \($0.beatsPerBar)" })")
+        XCTAssertEqual(a.keyRegions.count, 1)
+        XCTAssertEqual(a.sections.count, 1)
+        XCTAssertEqual(a.sections.first?.beatsPerBar, 6)
+        print(ChordChart.text(analysis: a, vocabulary: v, style: .nashville, transpose: 0).prefix(1200))
         let plain = analyzer.redecode(a, probabilities: probs, extensionBoost: 0)
         XCTAssertGreaterThan(plain.segments.count, 40)
         let midi = MIDIExport.data(for: a, vocabulary: v)

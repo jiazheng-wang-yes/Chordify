@@ -46,6 +46,13 @@ public struct MusicalKey: Codable, Hashable, Sendable {
         }
     }
 
+    /// Number of sharps (positive) or flats (negative), for MIDI key signatures.
+    public var signature: Int {
+        let major = minor ? (tonic + 3) % 12 : tonic
+        let sharps = [0, -5, 2, -3, 4, -1, 6, 1, -4, 3, -2, 5][major]
+        return major == 6 && prefersFlats == true ? -6 : sharps
+    }
+
     public func name(transpose: Int = 0) -> String {
         let k = MusicalKey(tonic: (tonic + transpose + 120) % 12, minor: minor)
         return PitchSpelling.name(k.tonic, preferFlats: k.prefersFlats) + (minor ? " minor" : " major")
@@ -93,25 +100,71 @@ public enum ChordStyle: String, CaseIterable, Codable, Sendable {
     case jazz
     /// Triads and sevenths only, no slash bass.
     case simple
+    /// Nashville numbers: scale degrees of the local key (1, 4, 5, 6m, ♭7, 5/7 ...).
+    case nashville
+}
+
+public enum Nashville {
+    /// Degree names for the 12 semitones above the "1".
+    public static let degrees = ["1", "\u{266D}2", "2", "\u{266D}3", "3", "4", "\u{266F}4", "5", "\u{266D}6", "6", "\u{266D}7", "7"]
+
+    /// The pitch class that is "1": the tonic, or for minor keys optionally the
+    /// relative major (then the minor tonic is 6m).
+    public static func one(of key: MusicalKey, minorFromRelativeMajor: Bool) -> Int {
+        key.minor && minorFromRelativeMajor ? (key.tonic + 3) % 12 : key.tonic
+    }
+
+    public static func degree(_ pc: Int, one: Int) -> String {
+        degrees[((pc - one) % 12 + 12) % 12]
+    }
 }
 
 public struct ChordSymbol: Hashable, Sendable {
     public var root: String
     public var suffix: String
     public var bass: String?
+    /// Nashville number: in plain text a suffix starting with a digit is put in
+    /// parentheses ("5(7)", not "57").
+    public var isNumber = false
 
-    public var text: String { root + suffix + (bass.map { "/" + $0 } ?? "") }
+    public init(root: String, suffix: String, bass: String?, isNumber: Bool = false) {
+        self.root = root
+        self.suffix = suffix
+        self.bass = bass
+        self.isNumber = isNumber
+    }
+
+    public var text: String {
+        let sfx = isNumber && (suffix.first?.isNumber ?? false) ? "(" + suffix + ")" : suffix
+        return root + sfx + (bass.map { "/" + $0 } ?? "")
+    }
     public static let noChord = ChordSymbol(root: "N.C.", suffix: "", bass: nil)
 }
 
 extension ChordVocabulary {
+    /// Symbol in the context of the local key (untransposed): the key sets the
+    /// spelling (flats or sharps) and, for Nashville numbers, the "1".
+    public func symbol(for s: ChordSegment, style: ChordStyle, transpose: Int, key: MusicalKey?,
+                       minorFromRelativeMajor: Bool = false) -> ChordSymbol {
+        let k = key.map { MusicalKey(tonic: ($0.tonic + transpose + 120) % 12, minor: $0.minor) }
+        if style == .nashville, let k, !s.isNoChord {
+            let t = types[s.typeIndex]
+            let one = Nashville.one(of: k, minorFromRelativeMajor: minorFromRelativeMajor)
+            let root = (s.root + transpose + 120) % 12
+            let bass = t.bass == 0 ? nil : Nashville.degree((root + t.bass) % 12, one: one)
+            return ChordSymbol(root: Nashville.degree(root, one: one), suffix: t.simple, bass: bass, isNumber: true)
+        }
+        return symbol(for: s, style: style == .nashville ? .simple : style, transpose: transpose,
+                      preferFlats: k?.prefersFlats ?? nil)
+    }
+
     public func symbol(for s: ChordSegment, style: ChordStyle, transpose: Int, preferFlats: Bool?) -> ChordSymbol {
         if s.isNoChord { return .noChord }
         let t = types[s.typeIndex]
         let root = (s.root + transpose + 120) % 12
         let rootName = PitchSpelling.name(root, preferFlats: preferFlats)
         switch style {
-        case .simple:
+        case .simple, .nashville:
             return ChordSymbol(root: rootName, suffix: t.simple, bass: nil)
         case .jazz:
             let bassPC = (root + t.bass) % 12

@@ -13,12 +13,12 @@ public enum MIDIExport {
         public var transpose = 0
         public var style = ChordStyle.jazz
         public var includeBass = true
+        public var minorFromRelativeMajor = false
         public init() {}
     }
 
     public static func data(for a: SongAnalysis, vocabulary v: ChordVocabulary, options: Options = .init()) -> Data {
         let map = TempoMap(analysis: a)
-        let preferFlats = a.key.map { MusicalKey(tonic: ($0.tonic + options.transpose + 120) % 12, minor: $0.minor).prefersFlats } ?? nil
 
         // ---- track 0: tempo, meter, markers
         var conductor = [Event]()
@@ -29,9 +29,19 @@ public enum MIDIExport {
         for (tick, num) in map.meterChanges {
             conductor.append(.meta(tick, 0x58, [UInt8(clamping: num), 2, 24, 8]))
         }
+        // key signature at the start and at every modulation
+        let regions = a.keyRegions.isEmpty ? a.key.map { [KeyRegion(start: 0, end: a.duration, key: $0)] } ?? [] : a.keyRegions
+        for r in regions {
+            let k = MusicalKey(tonic: (r.key.tonic + options.transpose + 120) % 12, minor: r.key.minor)
+            conductor.append(.meta(map.tick(r.start), 0x59, [UInt8(bitPattern: Int8(k.signature)), k.minor ? 1 : 0]))
+            if r.start > 0 {
+                conductor.append(.meta(map.tick(r.start), 0x01, Array(PitchSpelling.ascii("Key: " + k.name()).utf8)))
+            }
+        }
         for s in a.segments where !s.isNoChord {
-            let name = PitchSpelling.ascii(v.symbol(for: s, style: options.style, transpose: options.transpose, preferFlats: preferFlats).text)
-            conductor.append(.meta(map.tick(s.start), 0x06, Array(name.utf8)))
+            let symbol = v.symbol(for: s, style: options.style, transpose: options.transpose, key: a.key(at: s.start),
+                                  minorFromRelativeMajor: options.minorFromRelativeMajor)
+            conductor.append(.meta(map.tick(s.start), 0x06, Array(PitchSpelling.ascii(symbol.text).utf8)))
         }
 
         // ---- tracks 1 and 2: notes
